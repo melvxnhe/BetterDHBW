@@ -1,0 +1,7 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "timetable", "runtimeExecutable": "node", "runtimeArgs": ["serve.mjs"], "port": 8137 },
+    { "name": "timetable-test", "runtimeExecutable": "node", "runtimeArgs": ["serve.mjs", "8138"], "port": 8138 }
+  ]
+}
