@@ -31,6 +31,19 @@
 
   let view = null;
 
+  // Progress bars glide linearly from one minute to the next, but their first
+  // value appears as is: a sweep from empty on every load or redraw would be
+  // motion nobody asked for, and would suggest the lecture just started.
+  function setProgress(bar, share) {
+    const value = `scaleX(${Math.min(1, Math.max(0, share)).toFixed(4)})`;
+    if (bar.dataset.ready) { bar.style.transform = value; return; }
+    bar.style.transition = 'none';
+    bar.style.transform = value;
+    bar.getBoundingClientRect(); // commit the value before the transition returns
+    bar.style.transition = '';
+    bar.dataset.ready = '1';
+  }
+
   function mount(root) {
     const main = root.querySelector('main');
     const bar = root.querySelector('.bar');
@@ -44,7 +57,13 @@
     const panels = tabs.map((t) => main.querySelector('#' + t.getAttribute('aria-controls')));
     const now = main.querySelector('.now');
     const span = (el) => [+el.dataset.start, +el.dataset.end];
+    // the week of today, else the next one, else the last
+    const currentWeek = (ms) => { const i = panels.findIndex((p) => ms < span(p)[1]); return i < 0 ? panels.length - 1 : i; };
     let active = -1;
+    let shownFilter = 'all';
+    // The open week follows the calendar (Monday morning shows the new week)
+    // until the person picks a week themselves; from then on it stays put.
+    let follow = true;
 
     // ---- week tabs ----
 
@@ -66,7 +85,7 @@
       }
     }
 
-    function select(i, { animate = false, focus = false } = {}) {
+    function select(i, { animate = false, focus = false, remember = true } = {}) {
       if (i === active || i < 0 || i >= tabs.length) return;
       const from = active;
       active = i;
@@ -86,11 +105,12 @@
           { duration: reduceMotion.matches ? 150 : 200, easing: reduceMotion.matches ? 'ease' : EASE_OUT }
         );
       }
-      if (from >= 0) history.replaceState(null, '', '#' + panels[i].id);
+      if (from >= 0 && remember) history.replaceState(null, '', '#' + panels[i].id);
     }
 
     tabs.forEach((t, i) => t.addEventListener('click', (e) => {
       e.preventDefault();
+      follow = false;
       // detail is 0 for Enter/Space: keyboard actions never animate
       select(i, { animate: e.detail !== 0 });
     }));
@@ -99,6 +119,7 @@
       const keys = { ArrowRight: active + 1, ArrowLeft: active - 1, Home: 0, End: tabs.length - 1 };
       if (!(e.key in keys)) return;
       e.preventDefault();
+      follow = false;
       select(Math.max(0, Math.min(tabs.length - 1, keys[e.key])), { focus: true });
     });
 
@@ -108,6 +129,8 @@
     // ---- module filter ----
 
     function filter(id) {
+      if (id !== 'all' && !chips.some((c) => c.dataset.filter === id)) id = 'all';
+      shownFilter = id;
       chips.forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.filter === id)));
       sessions.forEach((s) => s.classList.toggle('is-dimmed', id !== 'all' && s.dataset.module !== id));
       panels.forEach((p, j) => tabs[j].classList.toggle('is-empty',
@@ -157,7 +180,7 @@
         const [a, b] = span(s);
         s.classList.add('is-live');
         s.querySelector('.session-status').textContent = `Läuft · noch ${duration(Math.max(1, Math.round((b - ms) / 6e4)))}`;
-        s.querySelector('.progress i').style.transform = `scaleX(${((ms - a) / (b - a)).toFixed(4)})`;
+        setProgress(s.querySelector('.progress i'), (ms - a) / (b - a));
       });
       if (next) {
         next.classList.add('is-next');
@@ -181,6 +204,9 @@
       });
 
       if (now) renderNow(live, next, t, running.length - 1);
+
+      // a new week began while the page was open: show it (instantly, nobody asked for motion)
+      if (follow && active >= 0) select(currentWeek(ms), { remember: false });
     }
 
     function renderNow(live, next, t, parallel = 0) {
@@ -206,7 +232,7 @@
         label.textContent = parallel > 0 ? `Läuft gerade · ${parallel + 1} Termine parallel` : 'Läuft gerade';
         meta.textContent = [`${fTime.format(a)} – ${fTime.format(b)}`, room].filter(Boolean).join(' · ');
         rel.textContent = `Noch ${duration(Math.max(1, Math.round((b - +t) / 6e4)))}`;
-        bar.querySelector('i').style.transform = `scaleX(${((+t - a) / (b - a)).toFixed(4)})`;
+        setProgress(bar.querySelector('i'), (+t - a) / (b - a));
       } else {
         label.textContent = 'Als Nächstes';
         meta.textContent = [fDayLong.format(a), `${fTime.format(a)} – ${fTime.format(b)}`, room].filter(Boolean).join(' · ');
@@ -219,15 +245,14 @@
 
     update();
     const fromHash = panels.findIndex((p) => '#' + p.id === location.hash);
-    const ms = +clock();
-    let start = fromHash;
-    if (start < 0) start = panels.findIndex((p) => ms < span(p)[1]);
-    if (start < 0) start = panels.length - 1;
-    select(start);
+    follow = fromHash < 0;
+    select(fromHash >= 0 ? fromHash : currentWeek(+clock()));
     filter('all');
 
     return {
       update,
+      filter,
+      get filterId() { return shownFilter; },
       destroy() { resize.disconnect(); scrolled?.disconnect(); },
     };
   }
@@ -238,14 +263,25 @@
     view = mount(root);
   }
 
-  // one clock for the page: tick on the minute, and when the tab comes back
-  function tick() {
+  // One clock for the page: on every full minute, and whenever the page comes
+  // back (tab shown again, phone unlocked, laptop woken, restored from the
+  // back/forward cache, network back). Timers in background tabs are throttled
+  // or frozen, so the minute tick alone would leave a stale page behind.
+  const syncs = []; // extra work per tick: the homepage preview, fresh Rapla data
+  function sync() {
+    syncs.forEach((fn) => fn());
     view?.update();
+  }
+
+  function tick() {
+    sync();
     setTimeout(tick, 60000 - (Date.now() % 60000) + 50);
   }
 
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) view?.update(); });
-  window.__timetable = { start, update: () => view?.update() };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
+  addEventListener('pageshow', (e) => { if (e.persisted) sync(); });
+  addEventListener('online', sync);
+  window.__timetable = { start, update: sync };
   start();
   setTimeout(tick, 60000 - (Date.now() % 60000) + 50);
 
@@ -300,6 +336,7 @@
   // Swap the page. Choices made by pointer fade in so content doesn't
   // teleport; keyboard choices and history steps stay instant.
   function swap({ view: kind, name, main, foot, title, animate }) {
+    shown = null;
     const m = document.querySelector('main');
     m.innerHTML = main;
     if (foot !== null) document.querySelector('.foot').innerHTML = foot;
@@ -346,10 +383,12 @@
       const events = await fetchEvents(course);
       if (token !== loadToken) return false;
       const now = Date.now();
+      // the address changes first, so the new plan doesn't pick up the old course's week anchor
+      if (push) history.pushState({ kurs: course.name }, '', url);
       swap({ view: 'course', name: course.name, title: `${course.name} Stundenplan`, animate,
         main: mainHTML(events, { course: course.name, now }), foot: footerHTML(events, { course: course.name, fetchedAt: now }) });
       setIcs(course.name, events);
-      if (push) history.pushState({ kurs: course.name }, '', url);
+      shown = { name: course.name, sig: JSON.stringify(events), at: now };
       write(RECENT, [course.name, ...recent().filter((n) => n !== course.name)].slice(0, 5));
       return true;
     } catch (err) {
@@ -366,6 +405,79 @@
       }
     }
   }
+
+  // ---- staying in sync with Rapla while the page stays open ----
+
+  const REFRESH = 10 * 60 * 1000;
+  let shown = null; // { name, sig, at }: the course on screen and what Rapla said last
+  let refreshing = false;
+
+  // Every ten minutes (checked on each tick, and when the tab comes back) the
+  // open course is fetched again. Only a real change redraws the plan, in
+  // place: same week, same filter, same scroll position, and without motion,
+  // because nobody asked for it.
+  async function refreshCourse() {
+    const mine = shown;
+    if (!mine || refreshing || document.hidden || Date.now() - mine.at < REFRESH) return;
+    refreshing = true;
+    const token = loadToken;
+    try {
+      const events = await fetchEvents(byName.get(mine.name));
+      if (token !== loadToken || shown !== mine) return;
+      const now = Date.now();
+      mine.at = now;
+      document.querySelector('.foot').innerHTML = footerHTML(events, { course: mine.name, fetchedAt: now });
+      setIcs(mine.name, events);
+      const sig = JSON.stringify(events);
+      if (sig === mine.sig) return;
+      mine.sig = sig;
+      const keep = view?.filterId || 'all', y = scrollY;
+      document.querySelector('main').innerHTML = mainHTML(events, { course: mine.name, now });
+      start();
+      view.filter(keep);
+      scrollTo({ top: y, behavior: 'instant' });
+    } catch {
+      mine.at = Date.now() - REFRESH + 60000; // offline or API down: try again in a minute
+    } finally {
+      refreshing = false;
+    }
+  }
+
+  // The homepage preview is drawn in the browser from the course's data, so it
+  // always shows the next day with lectures, not the day the site was built.
+  // The data shipped with the page is refreshed from Rapla right away.
+  const sample = { name: catalog.sample?.name || null, events: normalize(catalog.sample?.raw || []), key: null, at: 0 };
+
+  function renderPreview(force = false) {
+    const stage = document.querySelector('.hero-stage');
+    if (current !== null || !stage || !sample.name) return;
+    const now = Date.now();
+    const { block } = splitBlock(sample.events);
+    const next = block.find((e) => e.end > now) || block.at(-1);
+    const key = next ? keyOf(partsOf(next.start)) : '';
+    if (!force && key === sample.key) return;
+    const html = previewHTML(sample.name, sample.events, now);
+    if (!html) return;
+    sample.key = key;
+    stage.innerHTML = html;
+    start();
+  }
+
+  async function refreshSample() {
+    const course = byName.get(sample.name);
+    if (current !== null || !course || document.hidden || Date.now() - sample.at < REFRESH) return;
+    sample.at = Date.now();
+    try {
+      const events = await fetchEvents(course);
+      if (JSON.stringify(events) === JSON.stringify(sample.events)) return;
+      sample.events = events;
+      renderPreview(true);
+    } catch {
+      sample.at = Date.now() - REFRESH + 60000;
+    }
+  }
+
+  syncs.push(() => { refreshCourse(); renderPreview(); refreshSample(); });
 
   document.addEventListener('click', (e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return;
@@ -541,6 +653,10 @@
     const heroInput = document.getElementById('hero-search');
     if (!heroInput) return;
     combobox(heroInput, document.getElementById('hero-list'), document.querySelector('[data-search-go]'));
+
+    // the preview as of now, then fresh data from Rapla
+    renderPreview(true);
+    refreshSample();
 
     const slot = document.querySelector('[data-recent]');
     const last = recent().slice(0, 3);

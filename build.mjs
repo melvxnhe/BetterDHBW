@@ -86,7 +86,7 @@ ${homeHTML(courses, { sample: course.name, sampleEvents: events, now: builtAt })
 ${homeFooterHTML(courses, { builtAt })}
 </footer>
 ${tail}
-<script type="application/json" id="course-data">${JSON.stringify({ courses }).replace(/</g, '\\u003c')}</script>
+<script type="application/json" id="course-data">${JSON.stringify({ courses, sample: { name: course.name, raw: raw.map(({ id, name, startTime, endTime, rooms, type }) => ({ id, name, startTime, endTime, rooms, type })) } }).replace(/</g, '\\u003c')}</script>
 <script>
 (() => {
 ${render}
