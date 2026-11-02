@@ -4,13 +4,14 @@
 //   node build.mjs --offline           build from data/*.json
 //   node build.mjs --course WWI26AWIA  another course for the homepage preview
 //
-// Writes index.html (the homepage with CSS and JS inlined: search, every
-// Mannheim course, a live preview of one course) and dev.html (worst-case
-// data sets behind a switcher, for testing only; do not publish it).
-// Courses open at ?kurs=<name> and are fetched in the browser through
-// serve.mjs, because api.dhbw.app does not allow cross-origin calls.
+// Writes public/index.html (the homepage with CSS and JS inlined: search,
+// every Mannheim course, a live preview of one course) and dev.html
+// (worst-case data sets behind a switcher, for testing only; it stays out of
+// public/ so it is never deployed). Courses open at ?kurs=<name> and are
+// fetched in the browser through /api, because api.dhbw.app does not allow
+// cross-origin calls: the functions in api/ on Vercel, serve.mjs locally.
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { normalize, courseList, mainHTML, homeHTML, homeFooterHTML, splitBlock, toWeeks, partsOf, hm, berlin, esc } from './src/render.js';
 
 const API = 'https://api.dhbw.app';
@@ -20,12 +21,19 @@ const offline = process.argv.includes('--offline');
 
 async function load(file, url) {
   if (offline) return JSON.parse(readFileSync(file, 'utf8'));
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`api.dhbw.app answered ${res.status} for ${url}`);
-  const data = await res.json();
-  mkdirSync('data', { recursive: true });
-  writeFileSync(file, JSON.stringify(data));
-  return data;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    if (!res.ok) throw new Error(`api.dhbw.app answered ${res.status} for ${url}`);
+    const data = await res.json();
+    mkdirSync('data', { recursive: true });
+    writeFileSync(file, JSON.stringify(data));
+    return data;
+  } catch (err) {
+    // a deploy shouldn't fail because the API is down: use the last saved copy
+    if (!existsSync(file)) throw err;
+    console.warn(`${err.message}; using ${file} from the last build`);
+    return JSON.parse(readFileSync(file, 'utf8'));
+  }
 }
 
 const courses = courseList(await load('data/courses.json', `${API}/courses`));
@@ -89,7 +97,8 @@ ${app}
 </html>
 `;
 
-writeFileSync('index.html', page({ events, title: 'Stundenpläne der DHBW Mannheim' }));
+mkdirSync('public', { recursive: true });
+writeFileSync('public/index.html', page({ events, title: 'Stundenpläne der DHBW Mannheim' }));
 
 // ---------- dev page: worst-case data behind a toggle (break-ui) ----------
 

@@ -1,0 +1,8 @@
+# build output: the site (public/) and the test page are made by `node build.mjs`
+public/
+dev.html
+index.html
+
+node_modules/
+.vercel/
+.taste-skill/
