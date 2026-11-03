@@ -4,17 +4,18 @@
 //   node serve.mjs          serves public/ on http://localhost:8137
 //   node serve.mjs 3000     on another port
 //
-// It passes two kinds of requests through to api.dhbw.app, which does not
+// It passes three kinds of requests through to api.dhbw.app, which does not
 // allow browsers to call it directly (same code as the Vercel functions):
 //   /api/courses                         every course
 //   /api/rapla/lectures/<id>/events      every event of one course, past ones included
+//   /api/mensa                           the Mensaria Metropol and greenes², this week
 // /dev.html, the page with test data, is served from the project folder.
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { upstream, HEADERS, COURSE_ID, eventsPath } from './api/_dhbw.js';
+import { upstream, HEADERS, COURSE_ID, eventsPath, MENSA_PATH, trimMensa } from './api/_dhbw.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const root = join(here, 'public') + sep;
@@ -29,11 +30,14 @@ const types = {
 
 async function proxy(path, res) {
   const id = path.match(/^\/rapla\/lectures\/([^/]+)\/events$/)?.[1];
-  if (path !== '/courses' && !(id && COURSE_ID.test(id))) {
+  if (path !== '/courses' && path !== '/mensa' && !(id && COURSE_ID.test(id))) {
     res.writeHead(404, { ...HEADERS, 'Cache-Control': 'no-store' }).end('{"error":"unknown path"}');
     return;
   }
-  const { status, body } = await upstream(id ? eventsPath(id) : path);
+  let { status, body } = await upstream(id ? eventsPath(id) : path === '/mensa' ? MENSA_PATH : path);
+  if (status === 200 && path === '/mensa') {
+    try { body = trimMensa(body); } catch { status = 502; body = '{"error":"unexpected answer from api.dhbw.app"}'; }
+  }
   res.writeHead(status, { ...HEADERS, 'Cache-Control': 'no-store' }).end(body);
 }
 

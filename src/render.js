@@ -301,7 +301,7 @@ ${weeks.length ? `<div class="controls">
 <div class="tabs tabs-active" aria-hidden="true">${weeks.map((w) => tab(w, true)).join('')}</div>
 </div>
 </nav>
-${chips ? `<div class="scroller"><div class="filters" role="group" aria-label="Nach Modul filtern"><button class="chip" type="button" data-filter="all" aria-pressed="true">Alle Module</button>${chips}</div></div>` : ''}
+${chips ? `<div class="scroller filters-scroll"><div class="filters" role="group" aria-label="Nach Modul filtern"><button class="chip" type="button" data-filter="all" aria-pressed="true">Alle Module</button>${chips}</div></div>` : ''}
 </div>
 
 <div class="weeks">
@@ -314,6 +314,7 @@ ${exams.length ? `<ol class="exam-list">
 ${exams.map(examHTML).join('\n')}
 </ol>` : '<p class="empty-state">In Rapla sind für diesen Block keine Prüfungen eingetragen.</p>'}
 </section>` : `<p class="empty-state empty-course">In Rapla sind für diesen Kurs keine Termine eingetragen. Vielleicht ist er schon fertig, oder noch nicht im Plan.</p>`}
+<section class="mensa" data-mensa aria-labelledby="mensa-title" hidden></section>
 </div>`;
 }
 
@@ -348,6 +349,59 @@ export function icsFor(course, events, now = Date.now()) {
   }
   lines.push('END:VCALENDAR');
   return lines.join('\r\n') + '\r\n';
+}
+
+// ---------- the mensa: Mensaria Metropol and greenes², from /api/mensa ----------
+
+const DAY_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+const euro = (n) => (typeof n === 'number' && n > 0 ? n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }) : '');
+const STW = 'https://www.stw-ma.de/essen-trinken/speiseplaene/mensaria-metropol-greenes/';
+
+// The days still ahead, today included until the counter closes ("11:30 – 14:00 Uhr").
+export function mensaDays(mensa, now = Date.now()) {
+  const p = partsOf(now), today = keyOf(p), clock = hm(p);
+  const close = (String(mensa?.hours || '').match(/(\d{1,2}):(\d{2})\D*$/) || []).slice(1).map((x) => x.padStart(2, '0')).join(':');
+  return (mensa?.days || [])
+    .map((d) => ({ ...d, key: keyOf(partsOf(+new Date(d.date))) }))
+    .filter((d) => d.key > today || (d.key === today && (!close || clock < close)))
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .slice(0, 5);
+}
+
+// "Power bowl: gebackene Kartoffeln, …" → name and what's in it;
+// "Lasagne Bolognese, Rucola und …" → the dish, then the rest.
+function dishHTML(d) {
+  const text = d.name.replace(/\s+/g, ' ').trim();
+  const at = text.indexOf(': ') > 0 && text.indexOf(': ') < 40 ? text.indexOf(': ') : text.indexOf(', ');
+  const head = at > 0 ? text.slice(0, at) : text, rest = at > 0 ? text.slice(at + 2) : '';
+  return `<li class="dish"><p class="dish-name"><b>${esc(head.charAt(0).toUpperCase() + head.slice(1))}</b>${rest ? ` <span>${esc(rest)}</span>` : ''}</p>${euro(d.student) ? `<p class="dish-price">${euro(d.student)}</p>` : ''}</li>`;
+}
+
+export function mensaHTML(mensa, { now = Date.now(), pick = null } = {}) {
+  const days = mensaDays(mensa, now);
+  const day = days.find((d) => d.key === pick) || days[0];
+  const today = keyOf(partsOf(now)), tomorrow = keyOf(partsOf(now + 864e5));
+  const label = (d) => {
+    const [y, m, dd] = d.key.split('-').map(Number);
+    const wd = DAY_SHORT[(new Date(Date.UTC(y, m - 1, dd)).getUTCDay() + 6) % 7];
+    return d.key === today ? 'Heute' : d.key === tomorrow ? 'Morgen' : `${wd} ${dd}.`;
+  };
+  const url = /^https:\/\/www\.stw-ma\.de\//.test(mensa?.url || '') ? mensa.url : STW;
+  const col = (title, list, extra = '') => `<div class="mensa-col"><h3 class="mensa-col-title">${title}</h3>
+${list.length ? `<ul class="dishes">${list.map(dishHTML).join('')}</ul>` : '<p class="mensa-none">Heute nichts eingetragen.</p>'}${extra}</div>`;
+  const desserts = day?.desserts?.length ? `<p class="mensa-desserts"><b>Dessert</b> ${esc(day.desserts.map((d) => d.name.trim()).join(' · '))}</p>` : '';
+  return `<header class="mensa-head">
+<div><h2 class="section-title" id="mensa-title">Mensa</h2>
+<p class="mensa-lead">${esc(mensa?.name || 'Mensaria Metropol')}${mensa?.hours ? ` · ${esc(mensa.hours.replace(/\s*Uhr\s*$/, ''))} Uhr` : ''} · Preise für Studierende</p></div>
+${days.length > 1 ? `<div class="mensa-days" role="group" aria-label="Tag wählen">${days.map((d) => `<button class="chip" type="button" data-mensa-day="${d.key}" aria-pressed="${d === day}">${label(d)}</button>`).join('')}</div>` : ''}
+</header>
+${!day ? '<p class="empty-state">Für die nächsten Tage ist noch kein Speiseplan eingetragen.</p>'
+    : day.closed ? `<p class="empty-state">${label(day)} ist die Mensa geschlossen.</p>`
+      : `<div class="mensa-grid">
+${col('Mensaria Metropol', day.main, desserts)}
+${col('greenes²', day.greenes)}
+</div>`}
+<p class="mensa-more"><a href="${esc(url)}" rel="noopener">Ganzer Speiseplan beim Studierendenwerk</a></p>`;
 }
 
 // ---------- the homepage ----------
@@ -487,6 +541,8 @@ export function homeHTML(courses, { sample, sampleEvents = [], now = Date.now() 
 </div>
 ${preview ? `<div class="hero-stage" data-ui>${preview}</div>` : ''}
 </section>
+
+<section class="mensa wrap" data-mensa aria-labelledby="mensa-title" hidden></section>
 
 <section class="directory wrap" id="kurse" aria-labelledby="kurse-title">
 <header class="section-head" data-reveal>

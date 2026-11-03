@@ -19,7 +19,29 @@ export const HEADERS = {
   'X-DHBW-Proxy': '1',
 };
 
-// path is "/courses" or eventsPath(id)
+// The Mensaria Metropol next to the DHBW. /mensa/MA lists every canteen of the
+// Studierendenwerk around Mannheim with images and empty allergen lists
+// (130 kB); the page only needs Metropol's dishes and prices. At Metropol the
+// API's "sideOrders" are the greenes² counter: bowls, wraps, focaccia.
+export const MENSA_PATH = '/mensa/MA';
+const MENSA = 'Mensaria Metropol';
+
+export function trimMensa(body) {
+  const list = JSON.parse(body);
+  const m = (Array.isArray(list) ? list : []).find((x) => x?.mensaInfo?.name === MENSA);
+  if (!m) throw new Error('no Mensaria Metropol in the answer');
+  const dishes = (l) => (Array.isArray(l) ? l : []).filter((d) => d?.name)
+    .map((d) => ({ name: String(d.name), student: d.priceStudent, employee: d.priceEmployee, guest: d.priceGuest }));
+  return JSON.stringify({
+    name: m.mensaInfo.name,
+    hours: m.mensaInfo.openingHours || '',
+    url: m.mensaInfo.menuUrl || '',
+    updated: m.lastUpdate || null,
+    days: (m.menus || []).map((d) => ({ date: d.date, closed: !!d.closed, main: dishes(d.mainCourses), greenes: dishes(d.sideOrders), desserts: dishes(d.desserts) })),
+  });
+}
+
+// path is "/courses", eventsPath(id) or MENSA_PATH
 export async function upstream(path) {
   const hit = cache.get(path);
   if (hit && Date.now() - hit.at < TTL) return hit;
@@ -34,8 +56,11 @@ export async function upstream(path) {
 }
 
 // Vercel's Node handler signature
-export async function respond(res, path) {
-  const { status, body } = await upstream(path);
+export async function respond(res, path, transform = null) {
+  let { status, body } = await upstream(path);
+  if (status === 200 && transform) {
+    try { body = transform(body); } catch { status = 502; body = '{"error":"unexpected answer from api.dhbw.app"}'; }
+  }
   for (const [k, v] of Object.entries(HEADERS)) res.setHeader(k, v);
   // let Vercel's edge cache answers for five minutes, then refresh in the background
   res.setHeader('Cache-Control', status === 200 ? 'public, s-maxage=300, stale-while-revalidate=600' : 'no-store');

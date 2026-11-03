@@ -583,6 +583,14 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 .chip .count { color: var(--muted); font-variant-numeric: tabular-nums; }
 .chip-label { max-width: 18em; overflow: hidden; text-overflow: ellipsis; }
 
+/* With a mouse a row that only scrolls sideways hides its last chips, so on
+   wider screens the modules wrap instead; phones keep the swipeable row. */
+@media (min-width: 720px) {
+  .filters-scroll { overflow: visible; margin-inline: 0; padding-inline: 0; }
+  .filters { flex-wrap: wrap; width: auto; }
+  .chip-label { max-width: 32em; }
+}
+
 .chip[aria-pressed="true"] { background: var(--text); color: var(--bg); }
 .chip[aria-pressed="true"] .count { color: inherit; opacity: 0.7; }
 
@@ -760,6 +768,72 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 /* ---------- exams ---------- */
 
 .exams { padding-block: 64px 24px; }
+
+/* ---------- mensa: Mensaria Metropol and greenes² ---------- */
+
+.mensa { padding-block: 40px 24px; }
+.home .mensa { padding-block: 96px 0; }
+
+.mensa-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: 16px;
+}
+
+.mensa-head .section-title { margin-bottom: 4px; }
+.mensa-lead { color: var(--muted); font-size: 0.9375rem; }
+
+.mensa-days { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* phones: the five days share the row evenly instead of leaving one behind */
+@media (max-width: 719px) {
+  .mensa-days { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; width: 100%; }
+  .mensa-days .chip { justify-content: center; padding-inline: 4px; }
+}
+
+.mensa-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 720px) {
+  .mensa-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+.mensa-col {
+  padding: 18px 20px 20px;
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.mensa-col-title { margin-bottom: 4px; font-size: 0.875rem; font-weight: 600; color: var(--muted); }
+
+.dishes { display: grid; margin: 0; padding: 0; list-style: none; }
+
+.dish {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 16px;
+  padding-block: 11px;
+  border-top: 1px solid var(--surface-2);
+}
+
+.dish:first-child { border-top: 0; }
+.dish-name { font-size: 0.9375rem; line-height: 1.4; overflow-wrap: break-word; }
+.dish-name b { font-weight: 600; }
+.dish-name span { color: var(--muted); }
+.dish-price { font-size: 0.9375rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.mensa-desserts { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--surface-2); color: var(--muted); font-size: 0.875rem; line-height: 1.45; }
+.mensa-desserts b { margin-right: 6px; color: var(--text); font-weight: 600; }
+.mensa-none { padding-block: 11px; color: var(--muted); font-size: 0.9375rem; }
+.mensa-more { margin-top: 14px; font-size: 0.875rem; }
+.mensa-more a { color: var(--muted); }
 
 .section-title {
   font-size: clamp(1.5rem, 3vw, 2rem);

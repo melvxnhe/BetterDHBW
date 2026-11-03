@@ -436,6 +436,7 @@
       document.querySelector('main').innerHTML = mainHTML(events, { course: mine.name, full: byName.get(mine.name).full, now });
       start();
       view.filter(keep);
+      renderMensa();
       scrollTo({ top: y, behavior: 'instant' });
     } catch {
       mine.at = Date.now() - REFRESH + 60000; // offline or API down: try again in a minute
@@ -478,7 +479,51 @@
     }
   }
 
-  syncs.push(() => { refreshCourse(); renderPreview(); refreshSample(); });
+  // ---- the mensa: fetched once, then hourly; drawn into every [data-mensa] slot ----
+
+  const MENSA_REFRESH = 60 * 60 * 1000;
+  const mensa = { data: null, at: 0, pick: null, loading: false };
+
+  // Redraws only when something would change (a new day, a new pick, new
+  // dishes), so the minute tick doesn't rebuild the card or steal focus.
+  function renderMensa() {
+    document.querySelectorAll('[data-mensa]').forEach((slot) => {
+      if (!mensa.data) { slot.hidden = true; return; }
+      const html = mensaHTML(mensa.data, { now: Date.now(), pick: mensa.pick });
+      if (slot.dataset.drawn === html) return;
+      const focused = slot.contains(document.activeElement) ? document.activeElement.dataset.mensaDay : null;
+      slot.innerHTML = html;
+      slot.dataset.drawn = html;
+      slot.hidden = false;
+      if (focused) slot.querySelector(`[data-mensa-day="${focused}"]`)?.focus({ preventScroll: true });
+    });
+  }
+
+  async function loadMensa() {
+    if (mensa.loading || document.hidden || Date.now() - mensa.at < MENSA_REFRESH) return;
+    mensa.loading = true;
+    mensa.at = Date.now();
+    try {
+      const res = await fetch('api/mensa', { headers: { Accept: 'application/json' } });
+      if (!res.ok || !res.headers.has('x-dhbw-proxy')) throw new Error('no mensa');
+      mensa.data = await res.json();
+    } catch {
+      if (!mensa.data) mensa.at = Date.now() - MENSA_REFRESH + 5 * 60000; // try again in five minutes
+    } finally {
+      mensa.loading = false;
+      renderMensa();
+    }
+  }
+
+  // A picked day stays picked; once it has passed, the card is back on the next one.
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mensa-day]');
+    if (!b) return;
+    mensa.pick = b.dataset.mensaDay;
+    renderMensa();
+  });
+
+  syncs.push(() => { refreshCourse(); renderPreview(); refreshSample(); loadMensa(); renderMensa(); });
 
   document.addEventListener('click', (e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return;
@@ -652,6 +697,10 @@
     pageObservers.forEach((o) => o.disconnect());
     pageObservers = [];
     bar.classList.remove('show-search');
+
+    // every page has a mensa slot: draw what is known, fetch if it's due
+    renderMensa();
+    loadMensa();
 
     const heroInput = document.getElementById('hero-search');
     if (!heroInput) return;

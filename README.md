@@ -19,7 +19,7 @@ npm start
 Das Repo ist fertig für Vercel, `vercel.json` stellt alles ein:
 
 - Build: `node build.mjs` holt Kursliste, Studiengänge und Vorschau-Kurs und schreibt die Seite nach `public/`.
-- `api/courses.js` und `api/rapla/lectures/[id]/events.js` reichen Abrufe an api.dhbw.app weiter; Vercels Edge-Cache hält Antworten fünf Minuten.
+- `api/courses.js`, `api/rapla/lectures/[id]/events.js` und `api/mensa.js` reichen Abrufe an api.dhbw.app weiter; Vercels Edge-Cache hält Antworten fünf Minuten.
 - Die Kursliste und die Vorschau auf der Startseite stammen vom letzten Build. Ist api.dhbw.app beim Build nicht erreichbar, nimmt der Build die gespeicherte Kopie aus `data/`.
 - Ein Push auf `main` löst den nächsten Deploy aus. Für eine täglich frische Kursliste in Vercel einen Deploy Hook anlegen und ihn regelmäßig aufrufen.
 
@@ -43,6 +43,12 @@ Das Repo ist fertig für Vercel, `vercel.json` stellt alles ein:
 - Die ganze laufende Theoriephase, auch die schon vergangenen Wochen (grau im Wochenwähler). Geöffnet wird die aktuelle Woche.
 - In der Praxisphase zeigt der Plan den nächsten Block, nach dem letzten Block den letzten. Ältere Blöcke stehen nur in der Kalenderdatei.
 - Unter dem Kürzel steht der volle Name, z. B. „Wirtschaftsinformatik – Software Engineering 26“. Studiengang aus api.dhbw.app, die Studienrichtung aus den Kürzeln der DHBW Mannheim (`TRACKS` in `src/render.js`); unbekannte Kürzel zeigen nur den Studiengang.
+
+## Mensa
+
+- Auf der Startseite und unter jedem Plan: was es in der Mensaria Metropol und bei greenes² gibt, mit Preisen für Studierende.
+- Die nächsten fünf Tage mit Speiseplan; heute nur bis die Ausgabe schließt (14:00), danach beginnt die Liste mit morgen.
+- Daten vom Studierendenwerk über api.dhbw.app (`/api/mensa`, auf Metropol gekürzt), stündlich neu geladen.
 
 ## Befehle
 
