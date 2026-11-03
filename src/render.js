@@ -357,15 +357,17 @@ const DAY_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const euro = (n) => (typeof n === 'number' && n > 0 ? n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }) : '');
 const STW = 'https://www.stw-ma.de/essen-trinken/speiseplaene/mensaria-metropol-greenes/';
 
-// The days still ahead, today included until the counter closes ("11:30 – 14:00 Uhr").
+// Today and the days ahead. Once the counter has closed ("11:30 – 14:00 Uhr")
+// today stays in the list, marked `over`, but the card opens on the next day.
 export function mensaDays(mensa, now = Date.now()) {
   const p = partsOf(now), today = keyOf(p), clock = hm(p);
   const close = (String(mensa?.hours || '').match(/(\d{1,2}):(\d{2})\D*$/) || []).slice(1).map((x) => x.padStart(2, '0')).join(':');
   return (mensa?.days || [])
     .map((d) => ({ ...d, key: keyOf(partsOf(+new Date(d.date))) }))
-    .filter((d) => d.key > today || (d.key === today && (!close || clock < close)))
+    .filter((d) => d.key >= today)
     .sort((a, b) => a.key.localeCompare(b.key))
-    .slice(0, 5);
+    .slice(0, 5)
+    .map((d) => ({ ...d, over: d.key === today && !!close && clock >= close }));
 }
 
 // "Power bowl: gebackene Kartoffeln, …" → name and what's in it;
@@ -379,7 +381,7 @@ function dishHTML(d) {
 
 export function mensaHTML(mensa, { now = Date.now(), pick = null } = {}) {
   const days = mensaDays(mensa, now);
-  const day = days.find((d) => d.key === pick) || days[0];
+  const day = days.find((d) => d.key === pick) || days.find((d) => !d.over) || days[0];
   const today = keyOf(partsOf(now)), tomorrow = keyOf(partsOf(now + 864e5));
   const label = (d) => {
     const [y, m, dd] = d.key.split('-').map(Number);
@@ -388,7 +390,7 @@ export function mensaHTML(mensa, { now = Date.now(), pick = null } = {}) {
   };
   const url = /^https:\/\/www\.stw-ma\.de\//.test(mensa?.url || '') ? mensa.url : STW;
   const col = (title, list, extra = '') => `<div class="mensa-col"><h3 class="mensa-col-title">${title}</h3>
-${list.length ? `<ul class="dishes">${list.map(dishHTML).join('')}</ul>` : '<p class="mensa-none">Heute nichts eingetragen.</p>'}${extra}</div>`;
+${list.length ? `<ul class="dishes">${list.map(dishHTML).join('')}</ul>` : '<p class="mensa-none">Nichts eingetragen.</p>'}${extra}</div>`;
   const desserts = day?.desserts?.length ? `<p class="mensa-desserts"><b>Dessert</b> ${esc(day.desserts.map((d) => d.name.trim()).join(' · '))}</p>` : '';
   return `<header class="mensa-head">
 <div><h2 class="section-title" id="mensa-title">Mensa</h2>
@@ -397,7 +399,7 @@ ${days.length > 1 ? `<div class="mensa-days" role="group" aria-label="Tag wähle
 </header>
 ${!day ? '<p class="empty-state">Für die nächsten Tage ist noch kein Speiseplan eingetragen.</p>'
     : day.closed ? `<p class="empty-state">${label(day)} ist die Mensa geschlossen.</p>`
-      : `<div class="mensa-grid">
+      : `${day.over ? `<p class="mensa-note">Die Ausgabe hat heute schon geschlossen${mensa?.hours ? ` (${esc(mensa.hours.replace(/\s*Uhr\s*$/, ''))} Uhr)` : ''}.</p>` : ''}<div class="mensa-grid">
 ${col('Mensaria Metropol', day.main, desserts)}
 ${col('greenes²', day.greenes)}
 </div>`}
