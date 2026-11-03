@@ -56,18 +56,23 @@ const TRACKS = {
   TINF: { CS: 'Cyber Security', IT: 'Informationstechnik', AI: 'Angewandte Informatik' },
 };
 
-// "WWI26SEA" → "Wirtschaftsinformatik – Software Engineering 26"
-function fullName(name, info) {
-  const degree = info?.degree?.name?.trim().replace(/\s+-\s+/g, ' – ').replace(/\s+/g, ' ');
-  if (!degree) return '';
-  const [, code = '', year = '', rest = ''] = name.match(/^([A-Z]+?)(\d{2})(.*)$/) || [];
+// "WWI26SEA" → "Software Engineering", or '' for codes without a known track
+function trackOf(name) {
+  const [, code = '', , rest = ''] = name.match(/^([A-Z]+?)(\d{2})(.*)$/) || [];
   const tracks = TRACKS[code] || {};
   const known = rest.split('-').map((part) => {
     const key = Object.keys(tracks).sort((a, b) => b.length - a.length)
       .find((k) => part.startsWith(k) && /^(?:[A-E]|\d)?$/.test(part.slice(k.length)));
     return key && tracks[key];
   }).filter(Boolean);
-  return `${degree}${known.length ? ` – ${[...new Set(known)].join(' & ')}` : ''}${year ? ` ${year}` : ''}`;
+  return [...new Set(known)].join(' & ');
+}
+
+// "WWI26SEA" → "Wirtschaftsinformatik – Software Engineering 26"
+function fullName(name, degree, track) {
+  if (!degree) return '';
+  const year = (name.match(/\d{2}/) || [''])[0];
+  return `${degree}${track ? ` – ${track}` : ''}${year ? ` ${year}` : ''}`;
 }
 
 // "MA-WWI26SEA" and "MA---WWI26SEA" are the same course in two Rapla
@@ -92,7 +97,8 @@ export function courseList(ids, parsed = []) {
     const year = name.match(/\d{2}/);
     const meta = [FACULTY[name[0]], year ? `Jahrgang 20${year[0]}` : ''].filter(Boolean).join(' · ');
     const degree = infoOf(name)?.degree?.name?.trim().replace(/\s+-\s+/g, ' – ').replace(/\s+/g, ' ') || '';
-    return { name, meta, degree, full: fullName(name, infoOf(name)), ids: list.sort((a, b) => a.length - b.length) };
+    const track = degree ? trackOf(name) : '';
+    return { name, meta, degree, track, full: fullName(name, degree, track), ids: list.sort((a, b) => a.length - b.length) };
   }).sort((a, b) => a.name.localeCompare(b.name, 'de'));
 }
 
@@ -109,67 +115,17 @@ const moduleName = (name) => name
   .replace(/^(Grundlagen der|Grundlegende|Einführung in die)\s+(?=\p{Lu})/u, '')
   .trim();
 
-// Rapla Mannheim publishes no lecturers, but some titles name one:
-// "Volkswirtschaftslehre (Prof. Dr. Hennig)", "Bibliothek Hr. Krosta",
-// "Grundlagen des Rechts - BGB I / Herr Sauer". The person is taken out of a
-// title that ends with them, and only noted where they stand mid-title.
-const HONORIFIC = '(?:Prof\\.(?:in)?|Dr\\.(?:in)?)';
-const SURNAME = "(?:(?:von|van|de|zu)\\s+)?(?!(?:Prof|Dr)\\b)\\p{Lu}[\\p{L}'’-]+"; // "Herr Dr" alone names nobody
-// a two-word name ends the title or a clause; a one-word name is not followed
-// by another capitalised word ("Prof. Zeynep Tuncer BA-…" is left alone)
-const PERSON = new RegExp(`(?:(?:Herrn?|Frau|Hr\\.|Fr\\.)\\s*(?:${HONORIFIC}\\s*)*|(?:${HONORIFIC}\\s*)+)`
-  + `(?:${SURNAME}\\s+(?!Online)\\p{Lu}\\p{Ll}[\\p{L}'’-]*(?=\\s*(?:$|[),/;–-]))|${SURNAME}(?=\\s*(?:$|[),/;:–.-])|\\s+[^\\p{Lu}]))`, 'u');
-
-// Often a bare surname in brackets: "Personalwirtschaft (Becker)",
-// "(Chammout, A.)", "(Frey/Heitfeld)". Brackets also hold notes and places,
-// so only name shapes count, minus the words Mannheim's titles put there.
-const NAME = "\\p{Lu}\\p{Ll}+(?:-\\p{Lu}\\p{Ll}+)?";
-const BARE = new RegExp(`^(?:(\\p{Lu})\\.\\s?)?(${NAME})(?:,\\s?(\\p{Lu})\\.)?$`, 'u');
-const BARE_MANY = new RegExp(`^${NAME}(?:\\s?[/&]\\s?${NAME}){1,3}$`, 'u');
-const NOT_A_NAME = /(?:ung|ungen|schaft|keit|heit|fach|modul|recht|lehre|tag|abschluss|gebäude|ionen|ion|ium|ik|ie|ismus|spiel|kurs|raum|räume|labor|seminar|projekt|gruppe|übung|klausur|prüfung|termin|woche|zeit|plan|teil|thema|themen|wahl|pflicht|präsenz|statt|frei|freiwillig|studium|vorlesung|veranstaltung|einführung|block|ersatz|ablauf|wesen|technik|management|marketing|design|grundlagen|entwurf|gespräch|sprechstunde|kreis|studierende|ingenieur|betreuer|vergabe)$/i;
-const NOT_A_NAME_WORD = new Set(['Online', 'Extern', 'Intern', 'Tutorium', 'Referate', 'Metalle', 'Praxis', 'Praxisbeispiele', 'Schweißen', 'Spanen', 'Java', 'Englisch', 'Motoren',
-  'Kunststoffe', 'Zotero', 'Aufgaben', 'Testat', 'Steuern', 'Wiederholer', 'Bachelor', 'Master', 'Audimax', 'Mensa', 'Bibliothek', 'Viessmann', 'Moodle', 'Zoom', 'Teams',
-  'Mannheim', 'Weinheim', 'Bensheim', 'Boppard', 'Gießen', 'Speyer', 'Lorsch', 'Dortmund', 'Nantes', 'Heidelberg', 'Ludwigshafen', 'Eppelheim', 'Coblitzallee', 'Käfertal']);
-const isName = (w) => !NOT_A_NAME.test(w) && !NOT_A_NAME_WORD.has(w);
-
-function bareLecturer(name) {
-  const m = name.match(/\s*\(([^()]{4,40})\)$/);
-  if (!m) return null;
-  const inner = m[1].trim(), rest = name.slice(0, m.index).trim();
-  if (rest.length < 3) return null;
-  const one = inner.match(BARE);
-  if (one && isName(one[2])) return { name: rest, lecturer: [one[1] || one[3], one[2]].filter(Boolean).map((x, i, all) => (i === 0 && all.length > 1 ? `${x}.` : x)).join(' ') };
-  if (BARE_MANY.test(inner) && inner.split(/\s?[/&]\s?/).every(isName)) return { name: rest, lecturer: inner.replace(/\s?([/&])\s?/g, ' $1 ') };
-  return null;
-}
-
-function lecturerOf(name) {
-  const m = name.match(PERSON);
-  if (!m) return bareLecturer(name) || { name, lecturer: '' };
-  // "Herr Siegel Repetitorium": the second word is not part of the name
-  const last = m[0].match(/\s(\p{Lu}[\p{L}'’-]+)$/u);
-  if (last && !/[.]\s\S+$/.test(m[0]) && !isName(last[1])) m[0] = m[0].slice(0, last.index);
-  const lecturer = m[0].replace(/^Herrn\b/, 'Herr').replace(/^Hr\.\s*/, 'Herr ').replace(/^Fr\.\s*/, 'Frau ').replace(/\s+/g, ' ').trim();
-  const before = name.slice(0, m.index), after = name.slice(m.index + m[0].length);
-  const bracketed = /\(\s*$/.test(before) && /^\s*\)\s*$/.test(after);
-  if (!bracketed && after.trim()) return { name, lecturer };
-  const rest = before.replace(bracketed ? /\s*\(\s*$/ : /\s*(?:[-–/,]+|\bmit|\bbei)?\s*$/, '').trim();
-  return { name: rest.length >= 3 ? rest : name, lecturer };
-}
-
 export function normalize(list) {
   const events = (Array.isArray(list) ? list : [])
     .filter((e) => e && e.startTime && e.endTime && e.name)
     .map((e) => {
       const start = +new Date(e.startTime), end = +new Date(e.endTime);
-      const titled = lecturerOf(String(e.name).trim().replace(/\s*\((MA-)?[A-Z][A-Z0-9-]*\d[A-Z0-9-]*\)\s*$/, '').replace(/\s+/g, ' '));
-      const name = titled.name;
-      const lecturer = String(e.lecturer || '').trim() || titled.lecturer;
+      const name = String(e.name).trim().replace(/\s*\((MA-)?[A-Z][A-Z0-9-]*\d[A-Z0-9-]*\)\s*$/, '').replace(/\s+/g, ' ');
       const rooms = (e.rooms || []).map((r) => String(r).replace(/ VL-Raum Unterrichtsraum$/, '').trim()).filter(Boolean);
       const online = e.type === 'ONLINE' || rooms.some((r) => /Online/.test(r));
       const exam = name.match(EXAM);
       return {
-        id: e.id, name, start, end, lecturer,
+        id: e.id, name, start, end,
         room: online ? 'Online' : rooms.length ? `Raum ${rooms.join(', ')}` : '',
         exam: exam ? exam[1] : '',
         moduleName: moduleName(name) || name,
@@ -240,11 +196,11 @@ export function toWeeks(block) {
 function sessionHTML(e) {
   const s = partsOf(e.start), en = partsOf(e.end);
   const meta = [e.room, hours(e.hours)].filter(Boolean).join(' · ');
-  return `<article class="session" data-module="${e.module}" data-start="${e.start}" data-end="${e.end}" data-room="${esc(e.room)}"${e.lecturer ? ` data-lecturer="${esc(e.lecturer)}"` : ''}>
+  return `<article class="session" data-module="${e.module}" data-start="${e.start}" data-end="${e.end}" data-room="${esc(e.room)}">
 ${e.exam ? `<span class="session-tag">${esc(e.exam)}</span>` : ''}<p class="session-time"><time datetime="${new Date(e.start).toISOString()}">${hm(s)}</time> – <time datetime="${new Date(e.end).toISOString()}">${hm(en)}</time></p>
 <h4 class="session-title">${title(e.name)}</h4>
 <p class="session-meta">${esc(meta)}</p>
-${e.lecturer ? `<p class="session-meta session-who">bei ${esc(e.lecturer)}</p>` : ''}<p class="session-status"></p>
+<p class="session-status"></p>
 <div class="progress" aria-hidden="true"><i></i></div>
 </article>`;
 }
@@ -273,7 +229,7 @@ function examHTML(e) {
 <p class="exam-date" aria-hidden="true"><span class="exam-day">${s.day}</span><span class="exam-month">${MON_SHORT[s.month - 1]}</span></p>
 <div class="exam-body">
 <h3 class="exam-name">${title(e.name)}</h3>
-<p class="exam-meta">${weekdayOf(s)}, ${longDate(s)} · ${hm(s)} – ${hm(en)}${e.room ? ' · ' + esc(e.room) : ''}${e.lecturer ? ' · bei ' + esc(e.lecturer) : ''}</p>
+<p class="exam-meta">${weekdayOf(s)}, ${longDate(s)} · ${hm(s)} – ${hm(en)}${e.room ? ' · ' + esc(e.room) : ''}</p>
 <p class="exam-countdown"></p>
 </div>
 </li>`;
@@ -291,7 +247,7 @@ function rangeText(first, last) {
 function nowCardHTML(block, now, heading = 'h2') {
   const next = block.find((e) => e.end > now);
   const meta = next ? (() => { const s = partsOf(next.start), en = partsOf(next.end);
-    return [`${weekdayOf(s)}, ${longDate(s)}`, `${hm(s)} – ${hm(en)}`, next.room, next.lecturer && `bei ${next.lecturer}`].filter(Boolean).join(' · '); })() : '';
+    return [`${weekdayOf(s)}, ${longDate(s)}`, `${hm(s)} – ${hm(en)}`, next.room].filter(Boolean).join(' · '); })() : '';
   return `<section class="now" aria-label="Aktueller Termin" aria-live="polite">
 <p class="now-label"><span class="now-pulse" aria-hidden="true"></span><span class="now-label-text">${next ? 'Als Nächstes' : 'Keine Termine'}</span></p>
 <${heading} class="now-title">${next ? title(next.name) : 'In Rapla sind für diesen Kurs keine kommenden Termine eingetragen.'}</${heading}>
@@ -388,7 +344,7 @@ export function icsFor(course, events, now = Date.now()) {
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//${course}//Stundenplan//DE`, 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${course} Stundenplan`, 'X-WR-TIMEZONE:Europe/Berlin'];
   for (const e of events) {
     lines.push('BEGIN:VEVENT', `UID:rapla-${e.id}-${course}@dhbw-stundenplan`, `DTSTAMP:${stamp(now)}`, `DTSTART:${stamp(e.start)}`, `DTEND:${stamp(e.end)}`,
-      `SUMMARY:${escI(e.name)}`, ...(e.lecturer ? [`DESCRIPTION:${escI(`bei ${e.lecturer}`)}`] : []), `LOCATION:${escI(e.room === 'Online' ? 'Online' : ['DHBW Mannheim', e.room].filter(Boolean).join(', '))}`, 'END:VEVENT');
+      `SUMMARY:${escI(e.name)}`, `LOCATION:${escI(e.room === 'Online' ? 'Online' : ['DHBW Mannheim', e.room].filter(Boolean).join(', '))}`, 'END:VEVENT');
   }
   lines.push('END:VCALENDAR');
   return lines.join('\r\n') + '\r\n';

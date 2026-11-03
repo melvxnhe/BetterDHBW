@@ -87,7 +87,7 @@ ${homeHTML(courses, { sample: course.name, sampleEvents: events, now: builtAt })
 ${homeFooterHTML(courses, { builtAt })}
 </footer>
 ${tail}
-<script type="application/json" id="course-data">${JSON.stringify({ courses, sample: { name: course.name, raw: raw.map(({ id, name, startTime, endTime, rooms, type, lecturer }) => ({ id, name, startTime, endTime, rooms, type, lecturer })) } }).replace(/</g, '\\u003c')}</script>
+<script type="application/json" id="course-data">${JSON.stringify({ courses, sample: { name: course.name, raw: raw.map(({ id, name, startTime, endTime, rooms, type }) => ({ id, name, startTime, endTime, rooms, type })) } }).replace(/</g, '\\u003c')}</script>
 <script>
 (() => {
 ${render}
@@ -117,8 +117,8 @@ function worstCase(base) {
   };
   return [
     // Monday: the longest realistic title, three rooms at once
-    ev(0, '08:45', '13:15', 'Projektmanagement und Requirements Engineering in agilen Softwareentwicklungsprojekten (Gruppe A und B, inkl. Prüfungsvorleistung) (Prof.in Dr.in Janning-Backfisch)', ['258B VL-Raum Unterrichtsraum', '180C VL-Raum Unterrichtsraum', 'E 101 Heinrich Vetter Saal']),
-    ev(0, '15:30', '20:00', 'Grundlagen der Programmierung (Kurtz/Mühleisen/Langer)'),
+    ev(0, '08:45', '13:15', 'Projektmanagement und Requirements Engineering in agilen Softwareentwicklungsprojekten (Gruppe A und B, inkl. Prüfungsvorleistung)', ['258B VL-Raum Unterrichtsraum', '180C VL-Raum Unterrichtsraum', 'E 101 Heinrich Vetter Saal']),
+    ev(0, '15:30', '20:00', 'Grundlagen der Programmierung'),
     // Tuesday: five entries, two of them overlapping, one only 15 minutes, one very late
     ev(1, '07:30', '08:00', 'Grundlegende Konzepte der IT'),
     ev(1, '08:00', '08:15', 'Kurzvortrag'),

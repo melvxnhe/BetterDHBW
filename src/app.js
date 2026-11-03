@@ -227,7 +227,7 @@
         return;
       }
       const [a, b] = span(pick);
-      const room = [pick.dataset.room, pick.dataset.lecturer && `bei ${pick.dataset.lecturer}`].filter(Boolean).join(' · ');
+      const room = pick.dataset.room;
       title.textContent = pick.querySelector('.session-title').textContent;
       if (live) {
         label.textContent = parallel > 0 ? `Läuft gerade · ${parallel + 1} Termine parallel` : 'Läuft gerade';
@@ -553,8 +553,8 @@
         ? items.map((x) => {
           if (x.group) return `<li class="search-group" role="presentation">${esc(x.group)}</li>`;
           if (x.note) return `<li class="search-note" role="presentation">${esc(x.note)}</li>`;
-          return `<li class="search-option" role="option" id="${prefix}-${esc(x.name)}" data-name="${esc(x.name)}" aria-selected="false">
-<span class="option-name">${mark(x.name, input.value)}</span><span class="option-meta">${esc(x.full || x.meta)}${x.name === current ? ' · geöffnet' : ''}</span></li>`;
+          return `<li class="search-option" role="option" id="${prefix}-${esc(x.name)}" data-name="${esc(x.name)}"${x.full ? ` title="${esc(x.full)}"` : ''} aria-selected="false">
+<span class="option-name">${mark(x.name, input.value)}</span><span class="option-meta">${esc(x.track || x.degree || x.meta)}${x.name === current ? ' · geöffnet' : ''}</span></li>`;
         }).join('')
         : `<li class="search-note" role="presentation">${input.value.trim() ? `Kein Kurs passt zu „${esc(input.value.trim())}“.` : `${courses.length} Kurse der DHBW Mannheim. Kürzel oder Studiengang tippen, z. B. WWI26 oder Software Engineering.`}</li>`;
       setActive(input.value.trim() && options.length ? 0 : -1);

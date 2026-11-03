@@ -274,10 +274,8 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 
 .search-option {
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 2px 12px;
+  gap: 12px;
   padding: 9px 10px;
   border-radius: 10px;
   cursor: pointer;
@@ -285,19 +283,11 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 
 .search-option[aria-selected="true"] { background: var(--surface-2); }
 
-/* the course code never breaks; the description beside it gives way first */
+/* One line per course, every row the same height: the code never breaks, the
+   description beside it (the track, else the degree) is cut at the end. */
 .option-name { flex-shrink: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-variant-numeric: tabular-nums; }
 .option-name b { color: var(--accent); font-weight: 700; }
-/* The full name differs at its end ("… Software Engineering 26"), so it is
-   never cut at the end: beside the code while it fits, else on its own line. */
-.option-meta {
-  flex: 1 1 15rem;
-  min-width: 0;
-  color: var(--muted);
-  font-size: 0.8125rem;
-  line-height: 1.35;
-  text-wrap: pretty;
-}
+.option-meta { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 0.8125rem; text-align: right; white-space: nowrap; }
 
 .error-state { display: grid; gap: 16px; max-width: 60ch; color: var(--text); }
 .error-state code { font-size: 0.9em; }
@@ -735,9 +725,6 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
   font-size: 0.8125rem;
   overflow-wrap: anywhere;
 }
-
-/* the lecturer on a line of their own, so a name breaks between words, not inside them */
-.session-who { overflow-wrap: break-word; text-wrap: balance; }
 
 .session-tag {
   justify-self: start;

@@ -43,7 +43,6 @@ Das Repo ist fertig für Vercel, `vercel.json` stellt alles ein:
 - Die ganze laufende Theoriephase, auch die schon vergangenen Wochen (grau im Wochenwähler). Geöffnet wird die aktuelle Woche.
 - In der Praxisphase zeigt der Plan den nächsten Block, nach dem letzten Block den letzten. Ältere Blöcke stehen nur in der Kalenderdatei.
 - Unter dem Kürzel steht der volle Name, z. B. „Wirtschaftsinformatik – Software Engineering 26“. Studiengang aus api.dhbw.app, die Studienrichtung aus den Kürzeln der DHBW Mannheim (`TRACKS` in `src/render.js`); unbekannte Kürzel zeigen nur den Studiengang.
-- Dozierende: Rapla Mannheim veröffentlicht keine. Steht ein Name im Titel („Volkswirtschaftslehre (Prof. Dr. Hennig)“, „Personalwirtschaft (Becker)“), erscheint er als „bei …“ unter dem Termin und im Kalender.
 
 ## Befehle
 
