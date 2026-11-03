@@ -191,6 +191,7 @@
       tabs.forEach((tab, j) => {
         const [a, b] = span(panels[j]);
         tab.classList.toggle('has-today', a <= ms && ms < b);
+        tab.classList.toggle('is-past', b <= ms);
       });
 
       exams.forEach((x) => {
@@ -226,7 +227,7 @@
         return;
       }
       const [a, b] = span(pick);
-      const room = pick.dataset.room;
+      const room = [pick.dataset.room, pick.dataset.lecturer && `bei ${pick.dataset.lecturer}`].filter(Boolean).join(' · ');
       title.textContent = pick.querySelector('.session-title').textContent;
       if (live) {
         label.textContent = parallel > 0 ? `Läuft gerade · ${parallel + 1} Termine parallel` : 'Läuft gerade';
@@ -386,7 +387,7 @@
       // the address changes first, so the new plan doesn't pick up the old course's week anchor
       if (push) history.pushState({ kurs: course.name }, '', url);
       swap({ view: 'course', name: course.name, title: `${course.name} Stundenplan`, animate,
-        main: mainHTML(events, { course: course.name, now }), foot: footerHTML(events, { course: course.name, fetchedAt: now }) });
+        main: mainHTML(events, { course: course.name, full: course.full, now }), foot: footerHTML(events, { course: course.name, fetchedAt: now }) });
       setIcs(course.name, events);
       shown = { name: course.name, sig: JSON.stringify(events), at: now };
       write(RECENT, [course.name, ...recent().filter((n) => n !== course.name)].slice(0, 5));
@@ -432,7 +433,7 @@
       if (sig === mine.sig) return;
       mine.sig = sig;
       const keep = view?.filterId || 'all', y = scrollY;
-      document.querySelector('main').innerHTML = mainHTML(events, { course: mine.name, now });
+      document.querySelector('main').innerHTML = mainHTML(events, { course: mine.name, full: byName.get(mine.name).full, now });
       start();
       view.filter(keep);
       scrollTo({ top: y, behavior: 'instant' });
@@ -452,7 +453,7 @@
     const stage = document.querySelector('.hero-stage');
     if (current !== null || !stage || !sample.name) return;
     const now = Date.now();
-    const { block } = splitBlock(sample.events);
+    const { block } = splitBlock(sample.events, now);
     const next = block.find((e) => e.end > now) || block.at(-1);
     const key = next ? keyOf(partsOf(next.start)) : '';
     if (!force && key === sample.key) return;
@@ -515,10 +516,12 @@
         ...(siblings.length ? [{ group: `Kurse wie ${current}` }, ...siblings] : []),
       ];
     }
+    // the code first ("WWI26SE"), then words of the full name ("Software Engineering")
     const hits = [];
     for (const c of courses) {
       const at = squash(c.name).indexOf(q);
       if (at >= 0) hits.push({ c, score: squash(c.name) === q ? 0 : at === 0 ? 1 : 2 });
+      else if (q.length >= 3 && squash(c.full || '').includes(q)) hits.push({ c, score: 3 });
     }
     hits.sort((a, b) => a.score - b.score || yearOf(b.c.name) - yearOf(a.c.name) || a.c.name.localeCompare(b.c.name, 'de'));
     const shown = hits.slice(0, 60).map((h) => h.c);
@@ -551,9 +554,9 @@
           if (x.group) return `<li class="search-group" role="presentation">${esc(x.group)}</li>`;
           if (x.note) return `<li class="search-note" role="presentation">${esc(x.note)}</li>`;
           return `<li class="search-option" role="option" id="${prefix}-${esc(x.name)}" data-name="${esc(x.name)}" aria-selected="false">
-<span class="option-name">${mark(x.name, input.value)}</span><span class="option-meta">${esc(x.meta)}${x.name === current ? ' · geöffnet' : ''}</span></li>`;
+<span class="option-name">${mark(x.name, input.value)}</span><span class="option-meta">${esc(x.full || x.meta)}${x.name === current ? ' · geöffnet' : ''}</span></li>`;
         }).join('')
-        : `<li class="search-note" role="presentation">${input.value.trim() ? `Kein Kurs passt zu „${esc(input.value.trim())}“.` : `${courses.length} Kurse der DHBW Mannheim. Kürzel tippen, z. B. WWI26 oder TINF.`}</li>`;
+        : `<li class="search-note" role="presentation">${input.value.trim() ? `Kein Kurs passt zu „${esc(input.value.trim())}“.` : `${courses.length} Kurse der DHBW Mannheim. Kürzel oder Studiengang tippen, z. B. WWI26 oder Software Engineering.`}</li>`;
       setActive(input.value.trim() && options.length ? 0 : -1);
     }
 

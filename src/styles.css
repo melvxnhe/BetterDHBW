@@ -274,9 +274,10 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 
 .search-option {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: 2px 12px;
   padding: 9px 10px;
   border-radius: 10px;
   cursor: pointer;
@@ -287,7 +288,16 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 /* the course code never breaks; the description beside it gives way first */
 .option-name { flex-shrink: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-variant-numeric: tabular-nums; }
 .option-name b { color: var(--accent); font-weight: 700; }
-.option-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 0.8125rem; white-space: nowrap; }
+/* The full name differs at its end ("… Software Engineering 26"), so it is
+   never cut at the end: beside the code while it fits, else on its own line. */
+.option-meta {
+  flex: 1 1 15rem;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  text-wrap: pretty;
+}
 
 .error-state { display: grid; gap: 16px; max-width: 60ch; color: var(--text); }
 .error-state code { font-size: 0.9em; }
@@ -363,6 +373,18 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
   line-height: 1;
   font-weight: 700;
   letter-spacing: -0.035em;
+}
+
+/* "Wirtschaftsinformatik – Software Engineering 26": what the code stands for */
+.title-full {
+  margin-top: 10px;
+  max-width: 32ch;
+  font-size: clamp(1.125rem, 2.2vw, 1.375rem);
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
 .subtitle {
@@ -507,6 +529,9 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 }
 
 .tab.has-today .tab-kw::after { opacity: 1; }
+/* weeks already over stay reachable, a step quieter than the ones ahead
+   (colour only: the clipped active copy above must keep the same widths) */
+.tab.is-past .tab-kw { color: var(--muted); }
 .tab.is-empty { opacity: 0.4; }
 
 /* The active look is a second copy of the tab list, clipped to the active tab.
@@ -710,6 +735,9 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
   font-size: 0.8125rem;
   overflow-wrap: anywhere;
 }
+
+/* the lecturer on a line of their own, so a name breaks between words, not inside them */
+.session-who { overflow-wrap: break-word; text-wrap: balance; }
 
 .session-tag {
   justify-self: start;
@@ -1093,6 +1121,7 @@ body[data-view="home"] .bar.show-search .search { opacity: 1; pointer-events: au
 
 .program-head b { font-weight: 700; letter-spacing: -0.01em; }
 .program-head span { color: var(--muted); font-size: 0.9375rem; }
+.program-degree { margin: -4px 0 8px; color: var(--muted); font-size: 0.875rem; line-height: 1.35; text-wrap: balance; }
 
 .program-year {
   display: grid;

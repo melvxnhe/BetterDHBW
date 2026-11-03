@@ -48,9 +48,39 @@ const title = (s) => esc(s).replace(/\p{L}{13,}/gu, (w) => w.replace(JOINTS, '&s
 
 const FACULTY = { W: 'Wirtschaft', T: 'Technik', G: 'Gesundheit', S: 'Sozialwesen', I: 'International' };
 
+// Studienrichtungen behind the letters after the year, as the DHBW Mannheim
+// names them. Only codes with a known meaning; the rest show the degree alone.
+const TRACKS = {
+  WWI: { SE: 'Software Engineering', SC: 'Sales & Consulting', AM: 'Application Management', DS: 'Data Science',
+    IMBIT: 'International Management for Business and Information Technology', EG: 'E-Government', DH: 'Digital Health', EH: 'E-Health' },
+  TINF: { CS: 'Cyber Security', IT: 'Informationstechnik', AI: 'Angewandte Informatik' },
+};
+
+// "WWI26SEA" → "Wirtschaftsinformatik – Software Engineering 26"
+function fullName(name, info) {
+  const degree = info?.degree?.name?.trim().replace(/\s+-\s+/g, ' – ').replace(/\s+/g, ' ');
+  if (!degree) return '';
+  const [, code = '', year = '', rest = ''] = name.match(/^([A-Z]+?)(\d{2})(.*)$/) || [];
+  const tracks = TRACKS[code] || {};
+  const known = rest.split('-').map((part) => {
+    const key = Object.keys(tracks).sort((a, b) => b.length - a.length)
+      .find((k) => part.startsWith(k) && /^(?:[A-E]|\d)?$/.test(part.slice(k.length)));
+    return key && tracks[key];
+  }).filter(Boolean);
+  return `${degree}${known.length ? ` – ${[...new Set(known)].join(' & ')}` : ''}${year ? ` ${year}` : ''}`;
+}
+
 // "MA-WWI26SEA" and "MA---WWI26SEA" are the same course in two Rapla
 // generations; the list keeps one name with every id, the older id first.
-export function courseList(ids) {
+// `parsed` is api.dhbw.app's /courses/MA/parsed: the degree of each course.
+export function courseList(ids, parsed = []) {
+  const info = new Map(), byCode = new Map();
+  for (const c of parsed) {
+    if (!c?.degree) continue;
+    info.set(String(c.name).replace(/^MA-+/, ''), c);
+    byCode.set(c.degree.abbreviation, c); // for courses only listed under their old id
+  }
+  const infoOf = (name) => info.get(name) || byCode.get((name.match(/^([A-Z]+?)\d{2}/) || [])[1]);
   const byName = new Map();
   for (const id of ids) {
     if (!/^MA-+[A-Z]/.test(id)) continue;
@@ -61,7 +91,8 @@ export function courseList(ids) {
   return [...byName].map(([name, list]) => {
     const year = name.match(/\d{2}/);
     const meta = [FACULTY[name[0]], year ? `Jahrgang 20${year[0]}` : ''].filter(Boolean).join(' · ');
-    return { name, meta, ids: list.sort((a, b) => a.length - b.length) };
+    const degree = infoOf(name)?.degree?.name?.trim().replace(/\s+-\s+/g, ' – ').replace(/\s+/g, ' ') || '';
+    return { name, meta, degree, full: fullName(name, infoOf(name)), ids: list.sort((a, b) => a.length - b.length) };
   }).sort((a, b) => a.name.localeCompare(b.name, 'de'));
 }
 
@@ -78,17 +109,67 @@ const moduleName = (name) => name
   .replace(/^(Grundlagen der|Grundlegende|Einführung in die)\s+(?=\p{Lu})/u, '')
   .trim();
 
+// Rapla Mannheim publishes no lecturers, but some titles name one:
+// "Volkswirtschaftslehre (Prof. Dr. Hennig)", "Bibliothek Hr. Krosta",
+// "Grundlagen des Rechts - BGB I / Herr Sauer". The person is taken out of a
+// title that ends with them, and only noted where they stand mid-title.
+const HONORIFIC = '(?:Prof\\.(?:in)?|Dr\\.(?:in)?)';
+const SURNAME = "(?:(?:von|van|de|zu)\\s+)?(?!(?:Prof|Dr)\\b)\\p{Lu}[\\p{L}'’-]+"; // "Herr Dr" alone names nobody
+// a two-word name ends the title or a clause; a one-word name is not followed
+// by another capitalised word ("Prof. Zeynep Tuncer BA-…" is left alone)
+const PERSON = new RegExp(`(?:(?:Herrn?|Frau|Hr\\.|Fr\\.)\\s*(?:${HONORIFIC}\\s*)*|(?:${HONORIFIC}\\s*)+)`
+  + `(?:${SURNAME}\\s+(?!Online)\\p{Lu}\\p{Ll}[\\p{L}'’-]*(?=\\s*(?:$|[),/;–-]))|${SURNAME}(?=\\s*(?:$|[),/;:–.-])|\\s+[^\\p{Lu}]))`, 'u');
+
+// Often a bare surname in brackets: "Personalwirtschaft (Becker)",
+// "(Chammout, A.)", "(Frey/Heitfeld)". Brackets also hold notes and places,
+// so only name shapes count, minus the words Mannheim's titles put there.
+const NAME = "\\p{Lu}\\p{Ll}+(?:-\\p{Lu}\\p{Ll}+)?";
+const BARE = new RegExp(`^(?:(\\p{Lu})\\.\\s?)?(${NAME})(?:,\\s?(\\p{Lu})\\.)?$`, 'u');
+const BARE_MANY = new RegExp(`^${NAME}(?:\\s?[/&]\\s?${NAME}){1,3}$`, 'u');
+const NOT_A_NAME = /(?:ung|ungen|schaft|keit|heit|fach|modul|recht|lehre|tag|abschluss|gebäude|ionen|ion|ium|ik|ie|ismus|spiel|kurs|raum|räume|labor|seminar|projekt|gruppe|übung|klausur|prüfung|termin|woche|zeit|plan|teil|thema|themen|wahl|pflicht|präsenz|statt|frei|freiwillig|studium|vorlesung|veranstaltung|einführung|block|ersatz|ablauf|wesen|technik|management|marketing|design|grundlagen|entwurf|gespräch|sprechstunde|kreis|studierende|ingenieur|betreuer|vergabe)$/i;
+const NOT_A_NAME_WORD = new Set(['Online', 'Extern', 'Intern', 'Tutorium', 'Referate', 'Metalle', 'Praxis', 'Praxisbeispiele', 'Schweißen', 'Spanen', 'Java', 'Englisch', 'Motoren',
+  'Kunststoffe', 'Zotero', 'Aufgaben', 'Testat', 'Steuern', 'Wiederholer', 'Bachelor', 'Master', 'Audimax', 'Mensa', 'Bibliothek', 'Viessmann', 'Moodle', 'Zoom', 'Teams',
+  'Mannheim', 'Weinheim', 'Bensheim', 'Boppard', 'Gießen', 'Speyer', 'Lorsch', 'Dortmund', 'Nantes', 'Heidelberg', 'Ludwigshafen', 'Eppelheim', 'Coblitzallee', 'Käfertal']);
+const isName = (w) => !NOT_A_NAME.test(w) && !NOT_A_NAME_WORD.has(w);
+
+function bareLecturer(name) {
+  const m = name.match(/\s*\(([^()]{4,40})\)$/);
+  if (!m) return null;
+  const inner = m[1].trim(), rest = name.slice(0, m.index).trim();
+  if (rest.length < 3) return null;
+  const one = inner.match(BARE);
+  if (one && isName(one[2])) return { name: rest, lecturer: [one[1] || one[3], one[2]].filter(Boolean).map((x, i, all) => (i === 0 && all.length > 1 ? `${x}.` : x)).join(' ') };
+  if (BARE_MANY.test(inner) && inner.split(/\s?[/&]\s?/).every(isName)) return { name: rest, lecturer: inner.replace(/\s?([/&])\s?/g, ' $1 ') };
+  return null;
+}
+
+function lecturerOf(name) {
+  const m = name.match(PERSON);
+  if (!m) return bareLecturer(name) || { name, lecturer: '' };
+  // "Herr Siegel Repetitorium": the second word is not part of the name
+  const last = m[0].match(/\s(\p{Lu}[\p{L}'’-]+)$/u);
+  if (last && !/[.]\s\S+$/.test(m[0]) && !isName(last[1])) m[0] = m[0].slice(0, last.index);
+  const lecturer = m[0].replace(/^Herrn\b/, 'Herr').replace(/^Hr\.\s*/, 'Herr ').replace(/^Fr\.\s*/, 'Frau ').replace(/\s+/g, ' ').trim();
+  const before = name.slice(0, m.index), after = name.slice(m.index + m[0].length);
+  const bracketed = /\(\s*$/.test(before) && /^\s*\)\s*$/.test(after);
+  if (!bracketed && after.trim()) return { name, lecturer };
+  const rest = before.replace(bracketed ? /\s*\(\s*$/ : /\s*(?:[-–/,]+|\bmit|\bbei)?\s*$/, '').trim();
+  return { name: rest.length >= 3 ? rest : name, lecturer };
+}
+
 export function normalize(list) {
   const events = (Array.isArray(list) ? list : [])
     .filter((e) => e && e.startTime && e.endTime && e.name)
     .map((e) => {
       const start = +new Date(e.startTime), end = +new Date(e.endTime);
-      const name = String(e.name).trim().replace(/\s*\((MA-)?[A-Z][A-Z0-9-]*\d[A-Z0-9-]*\)\s*$/, '').replace(/\s+/g, ' ');
+      const titled = lecturerOf(String(e.name).trim().replace(/\s*\((MA-)?[A-Z][A-Z0-9-]*\d[A-Z0-9-]*\)\s*$/, '').replace(/\s+/g, ' '));
+      const name = titled.name;
+      const lecturer = String(e.lecturer || '').trim() || titled.lecturer;
       const rooms = (e.rooms || []).map((r) => String(r).replace(/ VL-Raum Unterrichtsraum$/, '').trim()).filter(Boolean);
       const online = e.type === 'ONLINE' || rooms.some((r) => /Online/.test(r));
       const exam = name.match(EXAM);
       return {
-        id: e.id, name, start, end,
+        id: e.id, name, start, end, lecturer,
         room: online ? 'Online' : rooms.length ? `Raum ${rooms.join(', ')}` : '',
         exam: exam ? exam[1] : '',
         moduleName: moduleName(name) || name,
@@ -106,15 +187,19 @@ export function normalize(list) {
   return events;
 }
 
-// The current block: from the first entry until a gap of more than three
-// weeks (the practice phase). Everything after it is summed up in the footer.
-export function splitBlock(events) {
-  if (!events.length) return { block: [], later: [] };
-  let cut = events.length;
+// Theory phases are separated by gaps of more than three weeks (the practice
+// phase). The block shown is the one running now, else the next one, else the
+// last one; its past weeks stay in. Earlier and later blocks are only counted.
+export function splitBlock(events, now = Date.now()) {
+  if (!events.length) return { block: [], earlier: [], later: [] };
+  const blocks = [[events[0]]];
   for (let i = 1; i < events.length; i++) {
-    if (events[i].start - events[i - 1].end > 21 * 864e5) { cut = i; break; }
+    if (events[i].start - events[i - 1].end > 21 * 864e5) blocks.push([]);
+    blocks.at(-1).push(events[i]);
   }
-  return { block: events.slice(0, cut), later: events.slice(cut) };
+  let i = blocks.findIndex((b) => b.at(-1).end > now);
+  if (i < 0) i = blocks.length - 1;
+  return { block: blocks[i], earlier: blocks.slice(0, i).flat(), later: blocks.slice(i + 1).flat() };
 }
 
 // Every week from the first to the last entry, gaps included, so a week
@@ -155,11 +240,11 @@ export function toWeeks(block) {
 function sessionHTML(e) {
   const s = partsOf(e.start), en = partsOf(e.end);
   const meta = [e.room, hours(e.hours)].filter(Boolean).join(' · ');
-  return `<article class="session" data-module="${e.module}" data-start="${e.start}" data-end="${e.end}" data-room="${esc(e.room)}">
+  return `<article class="session" data-module="${e.module}" data-start="${e.start}" data-end="${e.end}" data-room="${esc(e.room)}"${e.lecturer ? ` data-lecturer="${esc(e.lecturer)}"` : ''}>
 ${e.exam ? `<span class="session-tag">${esc(e.exam)}</span>` : ''}<p class="session-time"><time datetime="${new Date(e.start).toISOString()}">${hm(s)}</time> – <time datetime="${new Date(e.end).toISOString()}">${hm(en)}</time></p>
 <h4 class="session-title">${title(e.name)}</h4>
 <p class="session-meta">${esc(meta)}</p>
-<p class="session-status"></p>
+${e.lecturer ? `<p class="session-meta session-who">bei ${esc(e.lecturer)}</p>` : ''}<p class="session-status"></p>
 <div class="progress" aria-hidden="true"><i></i></div>
 </article>`;
 }
@@ -188,7 +273,7 @@ function examHTML(e) {
 <p class="exam-date" aria-hidden="true"><span class="exam-day">${s.day}</span><span class="exam-month">${MON_SHORT[s.month - 1]}</span></p>
 <div class="exam-body">
 <h3 class="exam-name">${title(e.name)}</h3>
-<p class="exam-meta">${weekdayOf(s)}, ${longDate(s)} · ${hm(s)} – ${hm(en)}${e.room ? ' · ' + esc(e.room) : ''}</p>
+<p class="exam-meta">${weekdayOf(s)}, ${longDate(s)} · ${hm(s)} – ${hm(en)}${e.room ? ' · ' + esc(e.room) : ''}${e.lecturer ? ' · bei ' + esc(e.lecturer) : ''}</p>
 <p class="exam-countdown"></p>
 </div>
 </li>`;
@@ -206,7 +291,7 @@ function rangeText(first, last) {
 function nowCardHTML(block, now, heading = 'h2') {
   const next = block.find((e) => e.end > now);
   const meta = next ? (() => { const s = partsOf(next.start), en = partsOf(next.end);
-    return [`${weekdayOf(s)}, ${longDate(s)}`, `${hm(s)} – ${hm(en)}`, next.room].filter(Boolean).join(' · '); })() : '';
+    return [`${weekdayOf(s)}, ${longDate(s)}`, `${hm(s)} – ${hm(en)}`, next.room, next.lecturer && `bei ${next.lecturer}`].filter(Boolean).join(' · '); })() : '';
   return `<section class="now" aria-label="Aktueller Termin" aria-live="polite">
 <p class="now-label"><span class="now-pulse" aria-hidden="true"></span><span class="now-label-text">${next ? 'Als Nächstes' : 'Keine Termine'}</span></p>
 <${heading} class="now-title">${next ? title(next.name) : 'In Rapla sind für diesen Kurs keine kommenden Termine eingetragen.'}</${heading}>
@@ -218,8 +303,8 @@ function nowCardHTML(block, now, heading = 'h2') {
 
 // The <main> content for one course. `now` only decides what the now card
 // says before the script updates it.
-export function mainHTML(events, { course, now = Date.now() } = {}) {
-  const { block } = splitBlock(events);
+export function mainHTML(events, { course, full = '', now = Date.now() } = {}) {
+  const { block } = splitBlock(events, now);
   const weeks = toWeeks(block);
   const exams = block.filter((e) => e.exam);
   const lectures = block.filter((e) => !e.exam);
@@ -237,7 +322,7 @@ export function mainHTML(events, { course, now = Date.now() } = {}) {
 
   const tab = (w, copy) => copy
     ? `<span class="tab"><span class="tab-kw">KW ${w.kw}</span><span class="tab-range">${w.range}</span></span>`
-    : `<a class="tab" role="tab" id="tab-${w.id}" href="#${w.id}" aria-controls="${w.id}" aria-selected="false"><span class="tab-kw">KW ${w.kw}</span><span class="tab-range">${w.range}</span></a>`;
+    : `<a class="tab${w.end <= now ? ' is-past' : ''}" role="tab" id="tab-${w.id}" href="#${w.id}" aria-controls="${w.id}" aria-selected="false"><span class="tab-kw">KW ${w.kw}</span><span class="tab-range">${w.range}</span></a>`;
 
   const subtitle = block.length
     ? `Stundenplan der Theoriephase an der DHBW Mannheim, <b>${rangeText(block[0], block.at(-1))}</b>.${oneRoom}`
@@ -247,6 +332,7 @@ export function mainHTML(events, { course, now = Date.now() } = {}) {
 <section class="intro" aria-labelledby="page-title">
 <div>
 <h1 class="title" id="page-title">${esc(course)}</h1>
+${full ? `<p class="title-full">${esc(full)}</p>` : ''}
 <p class="subtitle">${subtitle}</p>
 </div>
 ${nowCardHTML(block, now)}
@@ -271,12 +357,12 @@ ${weeks.map(weekHTML).join('\n')}
 ${exams.length ? `<ol class="exam-list">
 ${exams.map(examHTML).join('\n')}
 </ol>` : '<p class="empty-state">In Rapla sind für diesen Block keine Prüfungen eingetragen.</p>'}
-</section>` : `<p class="empty-state empty-course">Rapla liefert nur kommende Termine. Dieser Kurs ist gerade vielleicht in der Praxisphase, oder er ist schon fertig.</p>`}
+</section>` : `<p class="empty-state empty-course">In Rapla sind für diesen Kurs keine Termine eingetragen. Vielleicht ist er schon fertig, oder noch nicht im Plan.</p>`}
 </div>`;
 }
 
 export function footerHTML(events, { course, fetchedAt = Date.now() } = {}) {
-  const { later } = splitBlock(events);
+  const { earlier, later } = splitBlock(events, fetchedAt);
   const p = partsOf(fetchedAt);
   let laterText = '';
   if (later.length) {
@@ -290,6 +376,7 @@ export function footerHTML(events, { course, fetchedAt = Date.now() } = {}) {
   }
   return `<div class="wrap">
 <p>Daten aus Rapla (DHBW Mannheim), abgerufen über <a href="https://dhbw.app">dhbw.app</a>. Stand: ${p.day}. ${MONTHS[p.month - 1]} ${p.year}, ${hm(p)} Uhr.</p>
+${earlier.length ? `<p>Vor diesem Block: ${plural(earlier.length, 'Termin', 'Termine')} aus früheren Theoriephasen, alle in der Kalenderdatei.</p>` : ''}
 ${laterText ? `<p>Nach diesem Block: ${laterText}.</p>` : ''}
 <p><a href="#" data-ics download="${esc(course.toLowerCase())}.ics">Alle Termine von ${esc(course)} als Kalenderdatei (.ics)</a></p>
 </div>`;
@@ -301,7 +388,7 @@ export function icsFor(course, events, now = Date.now()) {
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//${course}//Stundenplan//DE`, 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${course} Stundenplan`, 'X-WR-TIMEZONE:Europe/Berlin'];
   for (const e of events) {
     lines.push('BEGIN:VEVENT', `UID:rapla-${e.id}-${course}@dhbw-stundenplan`, `DTSTAMP:${stamp(now)}`, `DTSTART:${stamp(e.start)}`, `DTEND:${stamp(e.end)}`,
-      `SUMMARY:${escI(e.name)}`, `LOCATION:${escI(e.room === 'Online' ? 'Online' : ['DHBW Mannheim', e.room].filter(Boolean).join(', '))}`, 'END:VEVENT');
+      `SUMMARY:${escI(e.name)}`, ...(e.lecturer ? [`DESCRIPTION:${escI(`bei ${e.lecturer}`)}`] : []), `LOCATION:${escI(e.room === 'Online' ? 'Online' : ['DHBW Mannheim', e.room].filter(Boolean).join(', '))}`, 'END:VEVENT');
   }
   lines.push('END:VCALENDAR');
   return lines.join('\r\n') + '\r\n';
@@ -331,10 +418,10 @@ export function directory(courses) {
       count: [...programs.values()].reduce((n, l) => n + l.length, 0),
       programs: [...programs].map(([code, list]) => {
         const years = new Map();
-        list.forEach((c) => { const y = (c.name.match(/\d{2}/) || ['?'])[0]; if (!years.has(y)) years.set(y, []); years.get(y).push(c.name); });
+        list.forEach((c) => { const y = (c.name.match(/\d{2}/) || ['?'])[0]; if (!years.has(y)) years.set(y, []); years.get(y).push(c); });
         return {
-          code, count: list.length,
-          years: [...years].sort((a, b) => b[0].localeCompare(a[0])).map(([y, names]) => ({ year: y === '?' ? '' : `20${y}`, names: names.sort() })),
+          code, count: list.length, degree: (list.find((c) => c.degree) || {}).degree || '',
+          years: [...years].sort((a, b) => b[0].localeCompare(a[0])).map(([y, list]) => ({ year: y === '?' ? '' : `20${y}`, courses: list.sort((a, b) => a.name.localeCompare(b.name)) })),
         };
       }).sort((a, b) => b.count - a.count || a.code.localeCompare(b.code)),
     }));
@@ -392,7 +479,7 @@ const SEARCH_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="cur
 // A real piece of the timetable for the hero: one course's now card and its
 // next day with lectures. The page script keeps it live like the real plan.
 function previewHTML(course, events, now) {
-  const { block } = splitBlock(events);
+  const { block } = splitBlock(events, now);
   if (!block.length) return '';
   const upcoming = block.find((e) => e.end > now) || block.at(-1);
   const key = keyOf(partsOf(upcoming.start));
@@ -410,12 +497,13 @@ ${nowCardHTML(block, now, 'h3')}
 }
 
 function programHTML(p) {
-  const link = (n) => `<a class="course-link" href="?kurs=${encodeURIComponent(n)}" data-course-link="${esc(n)}">${esc(n)}</a>`;
+  const link = (c) => `<a class="course-link" href="?kurs=${encodeURIComponent(c.name)}" data-course-link="${esc(c.name)}"${c.full ? ` title="${esc(c.full)}"` : ''}>${esc(c.name)}</a>`;
   return `<li class="program" data-reveal>
 <span class="program-mark" aria-hidden="true"></span>
 <div class="program-body">
 <p class="program-head"><b>${esc(p.code)}</b><span>${plural(p.count, 'Kurs', 'Kurse')}</span></p>
-${p.years.map((y) => `<p class="program-year"><span class="year">${y.year}</span><span class="year-links">${y.names.map(link).join(' ')}</span></p>`).join('\n')}
+${p.degree ? `<p class="program-degree">${esc(p.degree)}</p>` : ''}
+${p.years.map((y) => `<p class="program-year"><span class="year">${y.year}</span><span class="year-links">${y.courses.map(link).join(' ')}</span></p>`).join('\n')}
 </div>
 </li>`;
 }
@@ -433,7 +521,7 @@ export function homeHTML(courses, { sample, sampleEvents = [], now = Date.now() 
 <p class="hero-lead">Alle ${courses.length} Kurse, live aus Rapla. Kürzel eingeben und die Woche sehen: was gerade läuft, in welchem Raum, und wann die nächste Klausur ist.</p>
 <div class="search search-hero" role="search">
 <label class="search-field">${SEARCH_ICON}<span class="visually-hidden">Kurs suchen</span>
-<input id="hero-search" type="search" placeholder="Kurskürzel, z. B. WWI26SEA" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go"
+<input id="hero-search" type="search" placeholder="Kürzel oder Studiengang, z. B. WWI26SEA" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go"
  role="combobox" aria-expanded="false" aria-controls="hero-list" aria-autocomplete="list"></label>
 <button class="button search-go" type="button" data-search-go>Plan öffnen</button>
 <ul id="hero-list" class="search-list" role="listbox" aria-label="Kurse" hidden></ul>
@@ -498,7 +586,7 @@ export function homeFooterHTML(courses, { builtAt = Date.now() } = {}) {
 ${blockmark()}
 <div class="foot-cols">
 <div><h2 class="foot-h">Fakultäten</h2>${dir.map((f) => `<p><a href="#fakultaet-${f.id.toLowerCase()}">${esc(f.name)}</a> <span class="foot-count">${f.count}</span></p>`).join('')}</div>
-<div><h2 class="foot-h">Daten</h2><p>Aus Rapla der DHBW Mannheim, abgerufen über <a href="https://dhbw.app">dhbw.app</a>. Kursliste vom ${p.day}. ${MONTHS[p.month - 1]} ${p.year}.</p><p>Rapla liefert nur kommende Termine.</p></div>
+<div><h2 class="foot-h">Daten</h2><p>Aus Rapla der DHBW Mannheim, abgerufen über <a href="https://dhbw.app">dhbw.app</a>. Kursliste vom ${p.day}. ${MONTHS[p.month - 1]} ${p.year}.</p><p>Jeder Plan zeigt die ganze laufende Theoriephase, die vergangenen Wochen eingeschlossen.</p></div>
 <div><h2 class="foot-h">Kalender</h2><p>Jeder Plan lässt sich als .ics-Datei laden und in Outlook, Google oder Apple Kalender importieren.</p></div>
 <div><h2 class="foot-h">Hinweis</h2><p>Ein inoffizielles Projekt, nicht von der DHBW Mannheim betrieben. Verbindlich bleibt Rapla.</p></div>
 </div>

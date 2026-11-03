@@ -1,5 +1,5 @@
-// GET /api/rapla/lectures/<id>/events: the upcoming events of one course
-import { respond, COURSE_ID, HEADERS } from '../../../_dhbw.js';
+// GET /api/rapla/lectures/<id>/events: every event of one course, past ones included
+import { respond, COURSE_ID, HEADERS, eventsPath } from '../../../_dhbw.js';
 
 export default async function handler(req, res) {
   const id = String(req.query.id || '');
@@ -8,5 +8,5 @@ export default async function handler(req, res) {
     res.status(400).send('{"error":"invalid course id"}');
     return;
   }
-  await respond(res, `/rapla/lectures/${id}/events`);
+  await respond(res, eventsPath(id));
 }

@@ -18,7 +18,7 @@ npm start
 
 Das Repo ist fertig für Vercel, `vercel.json` stellt alles ein:
 
-- Build: `node build.mjs` holt Kursliste und Vorschau-Kurs und schreibt die Seite nach `public/`.
+- Build: `node build.mjs` holt Kursliste, Studiengänge und Vorschau-Kurs und schreibt die Seite nach `public/`.
 - `api/courses.js` und `api/rapla/lectures/[id]/events.js` reichen Abrufe an api.dhbw.app weiter; Vercels Edge-Cache hält Antworten fünf Minuten.
 - Die Kursliste und die Vorschau auf der Startseite stammen vom letzten Build. Ist api.dhbw.app beim Build nicht erreichbar, nimmt der Build die gespeicherte Kopie aus `data/`.
 - Ein Push auf `main` löst den nächsten Deploy aus. Für eine täglich frische Kursliste in Vercel einen Deploy Hook anlegen und ihn regelmäßig aufrufen.
@@ -36,7 +36,14 @@ Das Repo ist fertig für Vercel, `vercel.json` stellt alles ein:
 - Pfeiltasten und Enter, oder klicken. `/` springt von überall in die Suche.
 - Ohne Eingabe zeigt die Liste die zuletzt geöffneten Kurse und die Nachbarkurse des offenen.
 - Der gewählte Kurs steht in der Adresse (`?kurs=WWI26AWIA`), lässt sich also teilen und als Lesezeichen speichern.
-- Rapla liefert nur kommende Termine. Kurse in der Praxisphase oder abgeschlossene Kurse sind deshalb leer.
+- Auch der volle Name passt: `software engineering`, `imbit`, `bank` finden die Kurse dazu.
+
+## Kursplan
+
+- Die ganze laufende Theoriephase, auch die schon vergangenen Wochen (grau im Wochenwähler). Geöffnet wird die aktuelle Woche.
+- In der Praxisphase zeigt der Plan den nächsten Block, nach dem letzten Block den letzten. Ältere Blöcke stehen nur in der Kalenderdatei.
+- Unter dem Kürzel steht der volle Name, z. B. „Wirtschaftsinformatik – Software Engineering 26“. Studiengang aus api.dhbw.app, die Studienrichtung aus den Kürzeln der DHBW Mannheim (`TRACKS` in `src/render.js`); unbekannte Kürzel zeigen nur den Studiengang.
+- Dozierende: Rapla Mannheim veröffentlicht keine. Steht ein Name im Titel („Volkswirtschaftslehre (Prof. Dr. Hennig)“, „Personalwirtschaft (Becker)“), erscheint er als „bei …“ unter dem Termin und im Kalender.
 
 ## Befehle
 

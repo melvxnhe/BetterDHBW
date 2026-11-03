@@ -7,14 +7,14 @@
 // It passes two kinds of requests through to api.dhbw.app, which does not
 // allow browsers to call it directly (same code as the Vercel functions):
 //   /api/courses                         every course
-//   /api/rapla/lectures/<id>/events      the upcoming events of one course
+//   /api/rapla/lectures/<id>/events      every event of one course, past ones included
 // /dev.html, the page with test data, is served from the project folder.
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { upstream, HEADERS, COURSE_ID } from './api/_dhbw.js';
+import { upstream, HEADERS, COURSE_ID, eventsPath } from './api/_dhbw.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const root = join(here, 'public') + sep;
@@ -33,7 +33,7 @@ async function proxy(path, res) {
     res.writeHead(404, { ...HEADERS, 'Cache-Control': 'no-store' }).end('{"error":"unknown path"}');
     return;
   }
-  const { status, body } = await upstream(path);
+  const { status, body } = await upstream(id ? eventsPath(id) : path);
   res.writeHead(status, { ...HEADERS, 'Cache-Control': 'no-store' }).end(body);
 }
 

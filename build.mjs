@@ -36,9 +36,10 @@ async function load(file, url) {
   }
 }
 
-const courses = courseList(await load('data/courses.json', `${API}/courses`));
-const course = courses.find((c) => c.name === COURSE) || { name: COURSE, meta: '', ids: [`MA-${COURSE}`] };
-const raw = await load('data/events.json', `${API}/rapla/lectures/${course.ids[0]}/events`);
+const courses = courseList(await load('data/courses.json', `${API}/courses`), await load('data/parsed.json', `${API}/courses/MA/parsed`));
+const course = courses.find((c) => c.name === COURSE) || { name: COURSE, meta: '', full: '', ids: [`MA-${COURSE}`] };
+// archived=true: the past weeks of the running theory phase too
+const raw = await load('data/events.json', `${API}/rapla/lectures/${course.ids[0]}/events?archived=true`);
 const builtAt = Date.now();
 const events = normalize(raw);
 
@@ -86,7 +87,7 @@ ${homeHTML(courses, { sample: course.name, sampleEvents: events, now: builtAt })
 ${homeFooterHTML(courses, { builtAt })}
 </footer>
 ${tail}
-<script type="application/json" id="course-data">${JSON.stringify({ courses, sample: { name: course.name, raw: raw.map(({ id, name, startTime, endTime, rooms, type }) => ({ id, name, startTime, endTime, rooms, type })) } }).replace(/</g, '\\u003c')}</script>
+<script type="application/json" id="course-data">${JSON.stringify({ courses, sample: { name: course.name, raw: raw.map(({ id, name, startTime, endTime, rooms, type, lecturer }) => ({ id, name, startTime, endTime, rooms, type, lecturer })) } }).replace(/</g, '\\u003c')}</script>
 <script>
 (() => {
 ${render}
@@ -116,8 +117,8 @@ function worstCase(base) {
   };
   return [
     // Monday: the longest realistic title, three rooms at once
-    ev(0, '08:45', '13:15', 'Projektmanagement und Requirements Engineering in agilen Softwareentwicklungsprojekten (Gruppe A und B, inkl. Prüfungsvorleistung)', ['258B VL-Raum Unterrichtsraum', '180C VL-Raum Unterrichtsraum', 'E 101 Heinrich Vetter Saal']),
-    ev(0, '15:30', '20:00', 'Grundlagen der Programmierung'),
+    ev(0, '08:45', '13:15', 'Projektmanagement und Requirements Engineering in agilen Softwareentwicklungsprojekten (Gruppe A und B, inkl. Prüfungsvorleistung) (Prof.in Dr.in Janning-Backfisch)', ['258B VL-Raum Unterrichtsraum', '180C VL-Raum Unterrichtsraum', 'E 101 Heinrich Vetter Saal']),
+    ev(0, '15:30', '20:00', 'Grundlagen der Programmierung (Kurtz/Mühleisen/Langer)'),
     // Tuesday: five entries, two of them overlapping, one only 15 minutes, one very late
     ev(1, '07:30', '08:00', 'Grundlegende Konzepte der IT'),
     ev(1, '08:00', '08:15', 'Kurzvortrag'),
@@ -146,7 +147,7 @@ const devHead = `<style>
 .devbar button { border: 0; border-radius: 9px; padding: 8px 11px; background: transparent; font: inherit; color: inherit; cursor: pointer; }
 .devbar button[aria-pressed="true"] { background: #fff; font-weight: 600; }
 </style>`;
-const devTail = `${Object.entries(fixtures).map(([name, list]) => `<template data-fixture="${esc(name)}">${mainHTML(list, { course: course.name, now: builtAt })}</template>`).join('\n')}
+const devTail = `${Object.entries(fixtures).map(([name, list]) => `<template data-fixture="${esc(name)}">${mainHTML(list, { course: course.name, full: course.full, now: builtAt })}</template>`).join('\n')}
 <div class="devbar" role="group" aria-label="Testdaten (nur Entwicklung)">
 ${Object.keys(fixtures).map((n, i) => `<button type="button" data-fx="${esc(n)}" aria-pressed="${i === 0}">${esc(n)}</button>`).join('')}
 </div>
@@ -169,5 +170,5 @@ const devStart = `<script>if (new URLSearchParams(location.search).get('data')) 
 writeFileSync('dev.html', page({ events, title: 'Stundenpläne der DHBW Mannheim (Testdaten)', head: devHead, tail: devTail })
   .replace('</body>', `${devStart}\n</body>`));
 
-const { block } = splitBlock(events);
+const { block } = splitBlock(events, builtAt);
 console.log(`index.html: Startseite mit ${courses.length} Kursen, Vorschau ${course.name} (${block.length} Termine in ${toWeeks(block).length} Wochen) · Stand ${hm(partsOf(builtAt))} Uhr`);

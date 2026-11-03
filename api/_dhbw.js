@@ -9,13 +9,17 @@ const cache = new Map();
 
 export const COURSE_ID = /^[A-Za-z0-9-]{1,40}$/;
 
+// every event of a course: without archived=true the API drops the past ones,
+// and the page shows the weeks already gone of the running theory phase
+export const eventsPath = (id) => `/rapla/lectures/${id}/events?archived=true`;
+
 export const HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
   // the page checks for this header to tell the proxy from a plain static server
   'X-DHBW-Proxy': '1',
 };
 
-// path is "/courses" or "/rapla/lectures/<id>/events"
+// path is "/courses" or eventsPath(id)
 export async function upstream(path) {
   const hit = cache.get(path);
   if (hit && Date.now() - hit.at < TTL) return hit;
