@@ -47,7 +47,7 @@ Das Repo ist fertig für Vercel, `vercel.json` stellt alles ein:
 ## Mensa
 
 - Auf der Startseite und unter jedem Plan: was es in der Mensaria Metropol und bei greenes² gibt, mit Preisen für Studierende.
-- Heute und die nächsten Tage mit Speiseplan (fünf insgesamt). Vor 14:00 ist heute gewählt, danach morgen; heute bleibt anklickbar.
+- Heute und die nächsten Tage mit Speiseplan (fünf insgesamt), geöffnet wird heute. Nach 14:00 steht dabei, dass die Ausgabe schon geschlossen hat.
 - Daten vom Studierendenwerk über api.dhbw.app (`/api/mensa`, auf Metropol gekürzt), stündlich neu geladen.
 
 ## Befehle

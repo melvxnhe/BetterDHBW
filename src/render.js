@@ -357,8 +357,8 @@ const DAY_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const euro = (n) => (typeof n === 'number' && n > 0 ? n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }) : '');
 const STW = 'https://www.stw-ma.de/essen-trinken/speiseplaene/mensaria-metropol-greenes/';
 
-// Today and the days ahead. Once the counter has closed ("11:30 – 14:00 Uhr")
-// today stays in the list, marked `over`, but the card opens on the next day.
+// Today and the days ahead; the card opens on the first of them. Once the
+// counter has closed ("11:30 – 14:00 Uhr") today is marked `over`.
 export function mensaDays(mensa, now = Date.now()) {
   const p = partsOf(now), today = keyOf(p), clock = hm(p);
   const close = (String(mensa?.hours || '').match(/(\d{1,2}):(\d{2})\D*$/) || []).slice(1).map((x) => x.padStart(2, '0')).join(':');
@@ -381,7 +381,7 @@ function dishHTML(d) {
 
 export function mensaHTML(mensa, { now = Date.now(), pick = null } = {}) {
   const days = mensaDays(mensa, now);
-  const day = days.find((d) => d.key === pick) || days.find((d) => !d.over) || days[0];
+  const day = days.find((d) => d.key === pick) || days[0];
   const today = keyOf(partsOf(now)), tomorrow = keyOf(partsOf(now + 864e5));
   const label = (d) => {
     const [y, m, dd] = d.key.split('-').map(Number);
