@@ -819,6 +819,17 @@
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   const launched = (() => { try { const first = !sessionStorage.getItem('launched'); sessionStorage.setItem('launched', '1'); return first; } catch { return false; } })();
 
+  // On Windows and macOS an installed app opens at whatever size the browser
+  // remembers. On launch it fills the work area (the taskbar stays); later
+  // resizing is left alone. Chrome and Edge allow this for app windows only;
+  // in a tab, and on phones, the calls do nothing.
+  if (standalone && launched && matchMedia('(pointer: fine)').matches) {
+    try {
+      moveTo(screen.availLeft || 0, screen.availTop || 0);
+      resizeTo(screen.availWidth, screen.availHeight);
+    } catch { /* not allowed here: keep the size */ }
+  }
+
   if (!isDev) {
     const wanted = (new URLSearchParams(location.search).get('kurs') || '').toUpperCase();
     const last = standalone && launched && !wanted && !location.hash ? recent()[0] : null;
