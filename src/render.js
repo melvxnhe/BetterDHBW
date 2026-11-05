@@ -538,7 +538,7 @@ export function homeHTML(courses, { sample, sampleEvents = [], now = Date.now() 
 <button class="button search-go" type="button" data-search-go>Plan öffnen</button>
 <ul id="hero-list" class="search-list" role="listbox" aria-label="Kurse" hidden></ul>
 </div>
-<p class="hero-links"><a href="#kurse">Alle Kurse</a><a href="#so-gehts">So funktioniert’s</a><span class="hero-recent" data-recent hidden></span></p>
+<p class="hero-links"><a href="#kurse">Alle Kurse</a><a href="#so-gehts">So funktioniert’s</a><button class="link-button" type="button" data-install hidden>Als App installieren</button><span class="hero-recent" data-recent hidden></span></p>
 </div>
 </div>
 ${preview ? `<div class="hero-stage" data-ui>${preview}</div>` : ''}
@@ -601,7 +601,7 @@ ${blockmark()}
 <div class="foot-cols">
 <div><h2 class="foot-h">Fakultäten</h2>${dir.map((f) => `<p><a href="#fakultaet-${f.id.toLowerCase()}">${esc(f.name)}</a> <span class="foot-count">${f.count}</span></p>`).join('')}</div>
 <div><h2 class="foot-h">Daten</h2><p>Aus Rapla der DHBW Mannheim, abgerufen über <a href="https://dhbw.app">dhbw.app</a>. Kursliste vom ${p.day}. ${MONTHS[p.month - 1]} ${p.year}.</p><p>Jeder Plan zeigt die ganze laufende Theoriephase, die vergangenen Wochen eingeschlossen.</p></div>
-<div><h2 class="foot-h">Kalender</h2><p>Jeder Plan lässt sich als .ics-Datei laden und in Outlook, Google oder Apple Kalender importieren.</p></div>
+<div><h2 class="foot-h">App &amp; Kalender</h2><p>Als App: im Browser „App installieren“, auf dem iPhone Teilen → „Zum Home-Bildschirm“. Geöffnete Pläne gibt es dann auch offline.</p><p>Jeder Plan lässt sich außerdem als .ics-Datei in Outlook, Google oder Apple Kalender laden.</p></div>
 <div><h2 class="foot-h">Hinweis</h2><p>Ein inoffizielles Projekt, nicht von der DHBW Mannheim betrieben. Verbindlich bleibt Rapla.</p></div>
 </div>
 <p class="foot-last"><span>Stundenpläne der DHBW Mannheim</span><a class="button button-small" href="#top">Nach oben</a></p>

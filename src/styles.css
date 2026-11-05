@@ -771,6 +771,22 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 
 /* ---------- mensa: Mensaria Metropol and greenes² ---------- */
 
+/* the plan on screen is a saved copy */
+.offline-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 550;
+}
+
+.offline-note::before { content: ""; flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+
 .mensa { padding-block: 40px 24px; }
 .home .mensa { padding-block: 96px 0; }
 
@@ -1044,6 +1060,8 @@ body[data-view="home"] .bar.show-search .search { opacity: 1; pointer-events: au
 }
 
 .hero-links a { color: var(--text); text-underline-offset: 3px; }
+.link-button { padding: 0; border: 0; background: none; color: var(--text); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.link-button[hidden] { display: none; }
 .hero-recent { color: var(--muted); }
 .hero-recent a { margin-left: 6px; font-weight: 600; font-variant-numeric: tabular-nums; }
 

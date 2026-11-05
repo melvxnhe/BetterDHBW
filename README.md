@@ -50,6 +50,13 @@ Das Repo ist fertig für Vercel, `vercel.json` stellt alles ein:
 - Heute und die nächsten Tage mit Speiseplan (fünf insgesamt), geöffnet wird heute. Nach 14:00 steht dabei, dass die Ausgabe schon geschlossen hat.
 - Daten vom Studierendenwerk über api.dhbw.app (`/api/mensa`, auf Metropol gekürzt), stündlich neu geladen.
 
+## App und offline
+
+- Installierbar (PWA): in Chrome und Edge über „App installieren“ (auch der Knopf auf der Startseite), auf dem iPhone über Teilen → „Zum Home-Bildschirm“.
+- Als App gestartet öffnet sie den zuletzt geöffneten Kurs.
+- `sw.js` (Vorlage `src/sw.js`, vom Build mit Version versehen): Seite und Pläne zuerst aus dem Netz, ohne Netz der zuletzt gespeicherte Stand. Jeder einmal geöffnete Kurs und die Mensa gehen offline; die Seite sagt dann „Keine Verbindung · Stand …“. Ist das Netz zurück, lädt sie sofort neu.
+- Icons (`src/icon.mjs`) und `manifest.webmanifest` erzeugt der Build.
+
 ## Befehle
 
 | Befehl | Was es tut |

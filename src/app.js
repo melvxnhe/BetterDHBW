@@ -307,22 +307,39 @@
 
   class LoadError extends Error {}
 
+  // { events, saved }: saved is when the copy was stored if the service worker
+  // answered from its cache (offline), else null
   async function fetchEvents(course) {
-    let events = [];
+    let events = [], saved = null;
     for (const id of course.ids) {
       let res;
       try {
         res = await fetch(`api/rapla/lectures/${encodeURIComponent(id)}/events`, { headers: { Accept: 'application/json' } });
       } catch {
-        throw new LoadError('server');
+        throw new LoadError('offline'); // no network and nothing saved for this course
       }
       // serve.mjs marks its answers; anything else is a plain static server
       if (!res.headers.has('x-dhbw-proxy')) throw new LoadError('server');
       if (!res.ok) throw new LoadError('upstream');
       events = normalize(await res.json());
+      saved = res.headers.has('x-sw-offline') ? +res.headers.get('x-sw-saved') || null : null;
       if (events.length) break; // the older Rapla id may be empty; try the next
     }
-    return events;
+    return { events, saved };
+  }
+
+  // "Keine Verbindung · Stand 5. Nov., 09:56 Uhr": under the title while
+  // the plan on screen is a saved copy, removed once fresh data arrives
+  const fSaved = new Intl.DateTimeFormat('de-DE', { timeZone: TZ, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  function setOffline(saved) {
+    document.querySelector('.offline-note')?.remove();
+    const anchor = document.querySelector('.intro .subtitle');
+    if (!saved || !anchor) return;
+    const note = document.createElement('p');
+    note.className = 'offline-note';
+    note.setAttribute('role', 'status');
+    note.textContent = `Keine Verbindung · Stand ${fSaved.format(saved)} Uhr`;
+    anchor.after(note);
   }
 
   function setIcs(name, events) {
@@ -361,7 +378,9 @@
   function showError(name, kind, retry) {
     const msg = kind === 'server'
       ? 'Kurse lassen sich nur laden, wenn die Seite über <b>start.cmd</b> (oder <code>npm start</code>) läuft. api.dhbw.app erlaubt keine Abrufe direkt aus dem Browser, der lokale Server reicht sie weiter.'
-      : 'api.dhbw.app hat gerade nicht geantwortet. Später noch einmal versuchen.';
+      : kind === 'offline'
+        ? 'Keine Verbindung. Diesen Kurs hast du auf diesem Gerät noch nicht geöffnet, deshalb gibt es keinen gespeicherten Stand. Sobald du wieder online bist, lädt er von selbst.'
+        : 'api.dhbw.app hat gerade nicht geantwortet. Später noch einmal versuchen.';
     swap({ view: 'course', name, title: `${name} Stundenplan`, foot: null, animate: false, main: `<div class="wrap"><section class="intro" aria-labelledby="page-title"><div>
 <h1 class="title" id="page-title">${esc(name)}</h1>
 <p class="subtitle">Der Stundenplan konnte nicht geladen werden.</p></div></section>
@@ -381,15 +400,17 @@
     bar.classList.add('is-loading');
     const url = `?kurs=${encodeURIComponent(course.name)}`;
     try {
-      const events = await fetchEvents(course);
+      const { events, saved } = await fetchEvents(course);
       if (token !== loadToken) return false;
       const now = Date.now();
       // the address changes first, so the new plan doesn't pick up the old course's week anchor
       if (push) history.pushState({ kurs: course.name }, '', url);
       swap({ view: 'course', name: course.name, title: `${course.name} Stundenplan`, animate,
-        main: mainHTML(events, { course: course.name, full: course.full, now }), foot: footerHTML(events, { course: course.name, fetchedAt: now }) });
+        main: mainHTML(events, { course: course.name, full: course.full, now }), foot: footerHTML(events, { course: course.name, fetchedAt: saved || now }) });
       setIcs(course.name, events);
-      shown = { name: course.name, sig: JSON.stringify(events), at: now };
+      setOffline(saved);
+      // a saved copy is checked again in a minute, a fresh one in ten
+      shown = { name: course.name, sig: JSON.stringify(events), at: saved ? now - REFRESH + 60000 : now };
       write(RECENT, [course.name, ...recent().filter((n) => n !== course.name)].slice(0, 5));
       return true;
     } catch (err) {
@@ -423,20 +444,21 @@
     refreshing = true;
     const token = loadToken;
     try {
-      const events = await fetchEvents(byName.get(mine.name));
+      const { events, saved } = await fetchEvents(byName.get(mine.name));
       if (token !== loadToken || shown !== mine) return;
       const now = Date.now();
-      mine.at = now;
-      document.querySelector('.foot').innerHTML = footerHTML(events, { course: mine.name, fetchedAt: now });
+      mine.at = saved ? now - REFRESH + 60000 : now;
+      document.querySelector('.foot').innerHTML = footerHTML(events, { course: mine.name, fetchedAt: saved || now });
       setIcs(mine.name, events);
       const sig = JSON.stringify(events);
-      if (sig === mine.sig) return;
+      if (sig === mine.sig) { setOffline(saved); return; }
       mine.sig = sig;
       const keep = view?.filterId || 'all', y = scrollY;
       document.querySelector('main').innerHTML = mainHTML(events, { course: mine.name, full: byName.get(mine.name).full, now });
       start();
       view.filter(keep);
       renderMensa();
+      setOffline(saved);
       scrollTo({ top: y, behavior: 'instant' });
     } catch {
       mine.at = Date.now() - REFRESH + 60000; // offline or API down: try again in a minute
@@ -470,7 +492,7 @@
     if (current !== null || !course || document.hidden || Date.now() - sample.at < REFRESH) return;
     sample.at = Date.now();
     try {
-      const events = await fetchEvents(course);
+      const { events } = await fetchEvents(course);
       if (JSON.stringify(events) === JSON.stringify(sample.events)) return;
       sample.events = events;
       renderPreview(true);
@@ -507,6 +529,7 @@
       const res = await fetch('api/mensa', { headers: { Accept: 'application/json' } });
       if (!res.ok || !res.headers.has('x-dhbw-proxy')) throw new Error('no mensa');
       mensa.data = await res.json();
+      if (res.headers.has('x-sw-offline')) mensa.at = Date.now() - MENSA_REFRESH + 5 * 60000; // saved copy: retry soon
     } catch {
       if (!mensa.data) mensa.at = Date.now() - MENSA_REFRESH + 5 * 60000; // try again in five minutes
     } finally {
@@ -701,6 +724,7 @@
     // every page has a mensa slot: draw what is known, fetch if it's due
     renderMensa();
     loadMensa();
+    showInstall();
 
     const heroInput = document.getElementById('hero-search');
     if (!heroInput) return;
@@ -742,11 +766,69 @@
 
   // ---- first view: a course from the address, else the homepage ----
 
+  // ---- installable app ----
+
+  // Chrome and Edge offer installing through this event; the page keeps it for
+  // its own button. Safari has none: the footer says where to find it there.
+  let installPrompt = null;
+  function showInstall() {
+    document.querySelectorAll('[data-install]').forEach((b) => { b.hidden = !installPrompt; });
+  }
+  addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    installPrompt = e;
+    showInstall();
+  });
+  addEventListener('appinstalled', () => { installPrompt = null; showInstall(); });
+  document.addEventListener('click', async (e) => {
+    if (!e.target.closest('[data-install]') || !installPrompt) return;
+    const prompt = installPrompt;
+    installPrompt = null; // a prompt can be shown once
+    showInstall();
+    prompt.prompt();
+    await prompt.userChoice.catch(() => null);
+  });
+
+  // Network back: a course that failed loads by itself, and saved copies on
+  // screen are replaced right away instead of at the next check.
+  addEventListener('online', () => {
+    if (shown) shown.at = 0;
+    sample.at = 0;
+    mensa.at = 0;
+    document.querySelector('[data-retry]')?.click();
+    sync();
+  });
+
+  if ('serviceWorker' in navigator && !isDev && /^https?:$/.test(location.protocol)) {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* no offline support, the page works as before */ });
+    // The first install takes over a page whose data came past the worker, so
+    // nothing is saved yet: fetch again (no redraw unless it changed) to save it.
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (shown) shown.at = 0;
+      sample.at = 0;
+      mensa.at = 0;
+      sync();
+    });
+  }
+
+  // ---- first view: a course from the address, else the homepage ----
+
+  // Launched as an installed app without a course in the address, the app
+  // opens the course used last: that's what it's for. Once per launch, so the
+  // homepage stays reachable through the logo.
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const launched = (() => { try { const first = !sessionStorage.getItem('launched'); sessionStorage.setItem('launched', '1'); return first; } catch { return false; } })();
+
   if (!isDev) {
     const wanted = (new URLSearchParams(location.search).get('kurs') || '').toUpperCase();
+    const last = standalone && launched && !wanted && !location.hash ? recent()[0] : null;
     if (byName.has(wanted)) {
       document.body.dataset.view = 'course';
       loadCourse(wanted, { push: false, animate: false });
+    } else if (last) {
+      history.replaceState({ kurs: last }, '', `?kurs=${encodeURIComponent(last)}`);
+      document.body.dataset.view = 'course';
+      loadCourse(last, { push: false, animate: false });
     } else {
       setupPage();
     }

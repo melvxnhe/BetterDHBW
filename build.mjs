@@ -12,6 +12,8 @@
 // cross-origin calls: the functions in api/ on Vercel, serve.mjs locally.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { iconSVG, iconPNG } from './src/icon.mjs';
 import { normalize, courseList, mainHTML, homeHTML, homeFooterHTML, splitBlock, toWeeks, partsOf, hm, berlin, esc } from './src/render.js';
 
 const API = 'https://api.dhbw.app';
@@ -57,8 +59,16 @@ const page = ({ events, title, head = '', tail = '' }) => `<!doctype html>
 <html lang="de" class="no-js">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>${title}</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Stundenplan">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="description" content="Stundenpläne aller Kurse der DHBW Mannheim, live aus Rapla: Vorlesungen und Prüfungen der aktuellen Theoriephase.">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f5f7">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
@@ -99,7 +109,45 @@ ${app}
 `;
 
 mkdirSync('public', { recursive: true });
-writeFileSync('public/index.html', page({ events, title: 'Stundenpläne der DHBW Mannheim' }));
+const html = page({ events, title: 'Stundenpläne der DHBW Mannheim' });
+writeFileSync('public/index.html', html);
+
+// ---------- installable app: icons, manifest, service worker ----------
+
+mkdirSync('public/icons', { recursive: true });
+writeFileSync('public/icons/icon.svg', iconSVG());
+writeFileSync('public/icons/icon-192.png', iconPNG(192));
+writeFileSync('public/icons/icon-512.png', iconPNG(512));
+writeFileSync('public/icons/maskable-512.png', iconPNG(512, { rounded: false }));
+writeFileSync('public/icons/apple-touch-icon.png', iconPNG(180, { rounded: false }));
+
+const manifest = {
+  id: './',
+  name: 'Stundenpläne der DHBW Mannheim',
+  short_name: 'Stundenplan',
+  description: 'Stundenpläne aller Kurse der DHBW Mannheim, live aus Rapla, mit Mensa. Auch offline.',
+  lang: 'de',
+  dir: 'ltr',
+  start_url: './',
+  scope: './',
+  display: 'standalone',
+  orientation: 'any',
+  background_color: '#000000',
+  theme_color: '#000000',
+  categories: ['education', 'productivity'],
+  icons: [
+    { src: 'icons/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+    { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+    { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+    { src: 'icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+  ],
+};
+writeFileSync('public/manifest.webmanifest', JSON.stringify(manifest, null, 2));
+
+// a new version whenever the page or the worker changes, so browsers install the new worker
+const sw = readFileSync('src/sw.js', 'utf8');
+const version = createHash('sha256').update(html).update(sw).update(JSON.stringify(manifest)).digest('hex').slice(0, 12);
+writeFileSync('public/sw.js', sw.replace('__VERSION__', version));
 
 // ---------- dev page: worst-case data behind a toggle (break-ui) ----------
 
