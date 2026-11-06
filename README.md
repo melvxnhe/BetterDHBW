@@ -70,7 +70,7 @@ Anmelden ist freiwillig; der Stundenplan geht ohne. Mit Konto sind Kurs und zule
 ### Einrichten auf Vercel
 
 1. Vercel → Projekt → **Storage** → **Neon** → Datenbank anlegen und mit dem Projekt verbinden. Das setzt `DATABASE_URL`.
-2. Bei [resend.com](https://resend.com) ein Konto anlegen, eine eigene Domain bestätigen und einen API-Key erzeugen. In Vercel unter **Settings → Environment Variables** `RESEND_API_KEY` und `MAIL_FROM` (z. B. `Stundenplan <noreply@deine-domain.de>`) setzen. Ohne eigene Domain stellt Resend nur an die eigene Adresse zu.
+2. E-Mail über Gmail: im Google-Konto die Bestätigung in zwei Schritten einschalten, unter [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) ein App-Passwort erzeugen. In Vercel unter **Settings → Environment Variables** `SMTP_USER` (die Gmail-Adresse) und `SMTP_PASS` (das App-Passwort) setzen. Gmail verschickt bis etwa 500 Mails am Tag. Alternativ Resend mit eigener Domain (`RESEND_API_KEY`, `MAIL_FROM`), siehe `.env.example`.
 3. Neu deployen. Bis beides gesetzt ist, bleibt „Anmelden“ ausgeblendet bzw. Registrieren meldet, dass der Mail-Versand fehlt.
 
 ### Sicherheit

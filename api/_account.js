@@ -164,6 +164,23 @@ async function sendMail(ctx, { to, subject, lines, link, linkLabel }) {
     if (!res.ok) throw new Problem(502, 'mail-failed', 'Die E-Mail konnte gerade nicht verschickt werden. Bitte später noch einmal versuchen.');
     return;
   }
+  // SMTP, by default Gmail: SMTP_USER is the address, SMTP_PASS a Google app password
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    const { createTransport } = await import('nodemailer');
+    const port = Number(process.env.SMTP_PORT || 465);
+    const transport = createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com', port, secure: port === 465, requireTLS: port !== 465,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS.replace(/\s+/g, '') }, // app passwords are shown with spaces
+      connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 10000,
+    });
+    try {
+      await transport.sendMail({ from: process.env.MAIL_FROM || `Stundenplan DHBW Mannheim <${process.env.SMTP_USER}>`, to, subject, text, html });
+    } catch (err) {
+      console.error('smtp', err.code || err.message);
+      throw new Problem(502, 'mail-failed', 'Die E-Mail konnte gerade nicht verschickt werden. Bitte später noch einmal versuchen.');
+    }
+    return;
+  }
   if (ctx.dev) {
     // local development: no mail service, the link goes to the server console
     console.log(`\n[Mail an ${to}] ${subject}\n${text}\n`);
