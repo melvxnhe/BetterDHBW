@@ -57,6 +57,32 @@ Das Repo ist fertig für Vercel, `vercel.json` stellt alles ein:
 - `sw.js` (Vorlage `src/sw.js`, vom Build mit Version versehen): Seite und Pläne zuerst aus dem Netz, ohne Netz der zuletzt gespeicherte Stand. Jeder einmal geöffnete Kurs und die Mensa gehen offline; die Seite sagt dann „Keine Verbindung · Stand …“. Ist das Netz zurück, lädt sie sofort neu.
 - Icons (`src/icon.mjs`) und `manifest.webmanifest` erzeugt der Build.
 
+## Konten
+
+Anmelden ist freiwillig; der Stundenplan geht ohne. Mit Konto sind Kurs und zuletzt geöffnete Kurse auf allen Geräten gleich, und zu jeder Vorlesung gibt es eine private Notiz.
+
+- Registrieren nur mit Adressen der DHBW Mannheim (`…@student.dhbw-mannheim.de`, `…@dhbw-mannheim.de`), bestätigt per E-Mail-Link. Passwort vergessen: Link per E-Mail.
+- Server: `api/account.js` → `api/_account.js` (alle Regeln), Datenbank `api/_db.js` (Neon Postgres; Tabellen legt sie beim ersten Aufruf selbst an, oder `npm run db:migrate`).
+- Seite: `src/account.js` (Anmelden, Registrieren, Konto, Notizen), Adressen `?konto=anmelden`, `?konto=registrieren`, `?konto=konto`.
+- Lokal (`npm start`) ohne `DATABASE_URL`: eine Postgres-Datenbank in `.data/` (PGlite), E-Mails erscheinen in der Konsole.
+- `npm test`: 18 Angriffstests gegen einen frischen Server (fremde Domains, schwache Passwörter, CSRF, SQL-Injection, fremde Notizen, Sperren, …).
+
+### Einrichten auf Vercel
+
+1. Vercel → Projekt → **Storage** → **Neon** → Datenbank anlegen und mit dem Projekt verbinden. Das setzt `DATABASE_URL`.
+2. Bei [resend.com](https://resend.com) ein Konto anlegen, eine eigene Domain bestätigen und einen API-Key erzeugen. In Vercel unter **Settings → Environment Variables** `RESEND_API_KEY` und `MAIL_FROM` (z. B. `Stundenplan <noreply@deine-domain.de>`) setzen. Ohne eigene Domain stellt Resend nur an die eigene Adresse zu.
+3. Neu deployen. Bis beides gesetzt ist, bleibt „Anmelden“ ausgeblendet bzw. Registrieren meldet, dass der Mail-Versand fehlt.
+
+### Sicherheit
+
+- Passwörter: scrypt mit Salt, Vergleich in konstanter Zeit, mindestens 10 Zeichen, Abgleich mit bekannten Datenlecks (Have I Been Pwned, nur die ersten 5 Zeichen des SHA-1-Hashes verlassen den Server).
+- Sitzungen: zufälliger Token im Cookie `__Host-sid` (HttpOnly, Secure, SameSite=Lax), in der Datenbank nur dessen SHA-256. 30 Tage, Abmelden auf allen Geräten möglich, Passwort-Reset beendet alle Sitzungen.
+- Links in E-Mails: einmalig, 24 h bzw. 1 h, Token im `#`-Teil der Adresse (erreicht keinen Server-Log); Linkziel aus `APP_URL`, nie aus dem Host-Header.
+- Keine Konto-Aufzählung: Registrieren, Login und Reset antworten gleich, egal ob es die Adresse gibt; Sperre nach 5 Fehlversuchen pro Adresse, Limits pro IP.
+- CSRF: Änderungen nur als JSON mit eigener Herkunft. SQL nur mit Parametern.
+- Content-Security-Policy mit Hashes für das eingebettete CSS/JS, `frame-ancestors 'none'`, `nosniff`, Referrer-Policy, Permissions-Policy.
+- „Meine Daten herunterladen“ und „Konto löschen“ auf der Kontoseite.
+
 ## Befehle
 
 | Befehl | Was es tut |

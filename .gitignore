@@ -6,3 +6,9 @@ index.html
 node_modules/
 .vercel/
 .taste-skill/
+
+# local secrets and the local dev database
+.env
+.env.local
+.env.*.local
+.data/

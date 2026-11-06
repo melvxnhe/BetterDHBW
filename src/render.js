@@ -196,7 +196,7 @@ export function toWeeks(block) {
 function sessionHTML(e) {
   const s = partsOf(e.start), en = partsOf(e.end);
   const meta = [e.room, hours(e.hours)].filter(Boolean).join(' · ');
-  return `<article class="session" data-module="${e.module}" data-start="${e.start}" data-end="${e.end}" data-room="${esc(e.room)}">
+  return `<article class="session" data-id="${esc(String(e.id ?? ''))}" data-module="${e.module}" data-start="${e.start}" data-end="${e.end}" data-room="${esc(e.room)}">
 ${e.exam ? `<span class="session-tag">${esc(e.exam)}</span>` : ''}<p class="session-time"><time datetime="${new Date(e.start).toISOString()}">${hm(s)}</time> – <time datetime="${new Date(e.end).toISOString()}">${hm(en)}</time></p>
 <h4 class="session-title">${title(e.name)}</h4>
 <p class="session-meta">${esc(meta)}</p>
@@ -344,7 +344,7 @@ export function icsFor(course, events, now = Date.now()) {
   const escI = (s) => s.replace(/\\/g, '\\\\').replace(/[,;]/g, (m) => '\\' + m);
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//${course}//Stundenplan//DE`, 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${course} Stundenplan`, 'X-WR-TIMEZONE:Europe/Berlin'];
   for (const e of events) {
-    lines.push('BEGIN:VEVENT', `UID:rapla-${e.id}-${course}@dhbw-stundenplan`, `DTSTAMP:${stamp(now)}`, `DTSTART:${stamp(e.start)}`, `DTEND:${stamp(e.end)}`,
+    lines.push('BEGIN:VEVENT', `UID:rapla-${String(e.id).replace(/[^\w-]/g, '')}-${course}@dhbw-stundenplan`, `DTSTAMP:${stamp(now)}`, `DTSTART:${stamp(e.start)}`, `DTEND:${stamp(e.end)}`,
       `SUMMARY:${escI(e.name)}`, `LOCATION:${escI(e.room === 'Online' ? 'Online' : ['DHBW Mannheim', e.room].filter(Boolean).join(', '))}`, 'END:VEVENT');
   }
   lines.push('END:VCALENDAR');

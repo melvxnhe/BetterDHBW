@@ -148,7 +148,7 @@ button, .button, .chip, [role="tab"] {
   min-height: 60px;
 }
 
-.bar-inner > .button { grid-area: action; justify-self: end; }
+.bar-actions { grid-area: action; justify-self: end; display: flex; align-items: center; gap: 8px; }
 
 @media (max-width: 719px) {
   .bar-inner {
@@ -931,7 +931,8 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 
 .brand { color: inherit; text-decoration: none; }
 
-body[data-view="home"] .bar [data-ics] { display: none; }
+body[data-view="home"] .bar [data-ics],
+body[data-view="account"] .bar [data-ics] { display: none; }
 
 /* the header search waits until the big one has scrolled away */
 body[data-view="home"] .bar .search { opacity: 0; pointer-events: none; transition: opacity 150ms ease; }
@@ -1317,4 +1318,180 @@ body[data-view="home"] .foot {
   .tabs-active.is-moving { transition: none; }
   .progress i { transition: none; }
   .js .home[data-enter] :is(.hero-title, .hero-lead, .search-hero, .hero-links, .hero-stage) { animation: none; }
+}
+
+/* ---------- accounts: header link, forms, the account page ---------- */
+
+.button-quiet { background: var(--surface-2); color: var(--text); }
+.button-danger { background: var(--accent-fill); color: var(--on-accent); }
+.button-wide { justify-content: center; width: 100%; min-height: 44px; font-size: 0.9375rem; }
+.button[aria-busy="true"] { opacity: 0.55; pointer-events: none; }
+.button[hidden] { display: none; }
+
+/* phones: the header keeps the brand readable; the buttons show icons only */
+@media (max-width: 479px) {
+  .bar-actions .button { padding-inline: 10px; }
+  .bar-actions .button-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+
+.account { padding-block: 48px 96px; }
+
+.account-card {
+  max-width: 560px;
+  margin-inline: auto;
+}
+
+.account-title { font-size: clamp(2rem, 5vw, 2.75rem); line-height: 1.05; font-weight: 700; letter-spacing: -0.03em; }
+.account-lead { margin-top: 10px; color: var(--muted); font-size: 1.0625rem; line-height: 1.45; overflow-wrap: anywhere; }
+.account-lead a, .account-links a, .note-list a { color: var(--text); text-underline-offset: 3px; }
+
+.account-form { display: grid; gap: 16px; margin-top: 24px; }
+.account-section .account-form { margin-top: 12px; }
+.account-form > .button:not(.button-wide) { justify-self: start; }
+
+.field { display: grid; gap: 6px; }
+.field-label { font-size: 0.875rem; font-weight: 600; }
+.field-hint { color: var(--muted); font-size: 0.8125rem; line-height: 1.4; }
+
+.field input, .note-form textarea {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px; /* 16px or iOS zooms into the field */
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.field input:focus-visible, .note-form textarea:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent);
+}
+
+.password-wrap { position: relative; }
+.password-wrap input { padding-right: 96px; }
+.reveal {
+  position: absolute;
+  inset: 6px 6px 6px auto;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.form-message {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+.form-message.is-ok { background: var(--surface-2); color: var(--text); }
+.form-message[hidden] { display: none; }
+
+.account-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 24px;
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.account-section { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--hairline); }
+.account-section h2 { margin-bottom: 8px; font-size: 1.1875rem; font-weight: 650; letter-spacing: -0.01em; }
+.account-section > p { color: var(--muted); line-height: 1.5; }
+.account-section > p b { color: var(--text); font-weight: 600; }
+.account-card > [data-flash] { margin-top: 20px; }
+.account-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.muted { color: var(--muted); }
+
+.note-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.note-list li { padding: 14px 16px; border-radius: 14px; background: var(--surface); }
+.note-list-head { color: var(--muted); font-size: 0.8125rem; }
+.note-list-body { margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }
+
+/* ---------- notes on the timetable ---------- */
+
+.session-note {
+  margin-top: 4px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.note-button {
+  justify-self: start;
+  margin-top: 2px;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .note-button:hover { color: var(--text); }
+}
+
+/* The note dialog: a centred modal, so it scales from its centre. Opens in
+   200ms, closes at once (exits are faster than entrances); reduced motion
+   keeps only the fade. */
+.note-dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 22px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.3);
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+}
+
+@starting-style {
+  .note-dialog[open] { opacity: 0; transform: scale(0.96); }
+}
+
+.note-dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+
+.note-form { display: grid; gap: 10px; }
+.note-when { color: var(--muted); font-size: 0.875rem; }
+.note-title { font-size: 1.25rem; line-height: 1.2; font-weight: 650; overflow-wrap: anywhere; }
+.note-form textarea { min-height: 140px; resize: vertical; line-height: 1.45; background: var(--surface-2); }
+.note-count { justify-self: end; color: var(--muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+.note-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.note-actions span { flex: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .note-dialog { transition: opacity 150ms ease; }
+  @starting-style { .note-dialog[open] { transform: none; } }
 }

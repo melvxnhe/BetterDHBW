@@ -294,7 +294,8 @@
   const isDev = !!document.querySelector('template[data-fixture]');
   // the homepage as shipped; coming back to it later skips the first-load entrance
   const home = { main: document.querySelector('main').innerHTML.replace('class="home" data-enter', 'class="home"'), foot: document.querySelector('.foot').innerHTML, title: document.title };
-  let current = null; // null while the homepage shows
+  let current = null; // null while the homepage (or the account page) shows
+  let account = null;  // the hooks from setupAccounts (src/account.js)
   let icsUrl = null;
 
   const RECENT = 'dhbw-ma-zuletzt';
@@ -412,6 +413,7 @@
       // a saved copy is checked again in a minute, a fresh one in ten
       shown = { name: course.name, sig: JSON.stringify(events), at: saved ? now - REFRESH + 60000 : now };
       write(RECENT, [course.name, ...recent().filter((n) => n !== course.name)].slice(0, 5));
+      account?.courseShown(course.name);
       return true;
     } catch (err) {
       if (token !== loadToken) return false;
@@ -459,6 +461,7 @@
       view.filter(keep);
       renderMensa();
       setOffline(saved);
+      account?.decorate();
       scrollTo({ top: y, behavior: 'instant' });
     } catch {
       mine.at = Date.now() - REFRESH + 60000; // offline or API down: try again in a minute
@@ -562,9 +565,11 @@
   });
 
   addEventListener('popstate', () => {
-    const name = (new URLSearchParams(location.search).get('kurs') || '').toUpperCase();
+    const params = new URLSearchParams(location.search);
+    if (account?.route(params)) return;
+    const name = (params.get('kurs') || '').toUpperCase();
     if (byName.has(name)) { if (name !== current) loadCourse(name, { push: false, animate: false }); }
-    else if (current !== null) showHome({ push: false });
+    else if (document.body.dataset.view !== 'home') showHome({ push: false });
   });
 
   // ---- the search boxes (ARIA combobox): one in the header, one on the homepage ----
@@ -830,10 +835,19 @@
     } catch { /* not allowed here: keep the size */ }
   }
 
+  account = setupAccounts({
+    swap, showHome, loadCourse, byName, recent,
+    setRecent: (list) => write(RECENT, list),
+    getCurrent: () => current,
+  });
+
   if (!isDev) {
-    const wanted = (new URLSearchParams(location.search).get('kurs') || '').toUpperCase();
+    const params = new URLSearchParams(location.search);
+    const wanted = (params.get('kurs') || '').toUpperCase();
     const last = standalone && launched && !wanted && !location.hash ? recent()[0] : null;
-    if (byName.has(wanted)) {
+    if (account.route(params)) {
+      // ?konto=…: sign-in, sign-up, e-mail links, the account page
+    } else if (byName.has(wanted)) {
       document.body.dataset.view = 'course';
       loadCourse(wanted, { push: false, animate: false });
     } else if (last) {
