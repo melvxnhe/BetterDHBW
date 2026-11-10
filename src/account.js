@@ -3,9 +3,15 @@
 // private note per lecture. The server side is api/_account.js; the session
 // is an HttpOnly cookie this script never sees. Views live at ?konto=<view>.
 //
-// Called once by app.js with what it needs from the page; returns the hooks
-// app.js calls back (route, courseShown, decorate).
+// setupAccounts(app) is called once by app.js with what it needs from the page
+// ({ swap, showHome, loadCourse, byName, recent, setRecent, getCurrent }) and
+// returns the hooks app.js calls back:
+// - route(params): shows the account view an address asks for; false if it asks for none
+// - courseShown(name): a course was opened (save it, load its notes)
+// - decorate(): the plan was redrawn (put the notes back on it)
 function setupAccounts(app) {
+  const MAX_NOTE = 2000; // as on the server (api/_account.js)
+  const fNoteDate = new Intl.DateTimeFormat('de-DE', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const state = { available: false, user: null, settings: null, notes: new Map(), notesCourse: null, returnTo: null };
 
   async function api(action, { method = 'GET', body = null, query = null } = {}) {
@@ -54,8 +60,16 @@ function setupAccounts(app) {
     decorate();
   }
 
+  // The server no longer knows this session (expired, or signed out elsewhere).
+  function sessionEnded() {
+    signedOut();
+    show('anmelden');
+  }
+
+  // The open course and the recent ones are saved a moment after opening, so
+  // clicking through a few courses saves once.
   let saveTimer = null;
-  function courseOpened(name) {
+  function saveCourse(name) {
     if (!state.user) return;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
@@ -65,8 +79,8 @@ function setupAccounts(app) {
 
   // ---------- views ----------
 
-  const field = (name, label, { type = 'text', autocomplete = 'off', hint = '', extra = '' } = {}) => {
-    const id = `f-${name}`;
+  // `id`: only needed when two forms on one page have a field of the same name
+  const field = (name, label, { type = 'text', autocomplete = 'off', hint = '', extra = '', id = `f-${name}` } = {}) => {
     const input = `<input id="${id}" name="${name}" type="${type}" autocomplete="${autocomplete}" ${extra} required${hint ? ` aria-describedby="${id}-hint"` : ''}>`;
     return `<div class="field"><label class="field-label" for="${id}">${label}</label>${type === 'password'
       ? `<div class="password-wrap">${input}<button class="reveal" type="button" data-reveal-password aria-controls="${id}" aria-pressed="false">Anzeigen</button></div>`
@@ -130,7 +144,7 @@ ${field('password', 'Neues Passwort', { type: 'password', autocomplete: 'new-pas
 <button class="button button-quiet" type="button" data-account-action="export">Meine Daten herunterladen</button></div></section>
 <section class="account-section danger" aria-labelledby="delete-title"><h2 id="delete-title">Konto löschen</h2>
 <p>Löscht dein Konto, deine Einstellungen und alle Notizen sofort und endgültig.</p>
-<form class="account-form" data-form="delete" novalidate>${field('password', 'Passwort zur Bestätigung', { type: 'password', autocomplete: 'current-password', extra: 'maxlength="200"' }).replace(/f-password/g, 'f-delete-password')}${message}
+<form class="account-form" data-form="delete" novalidate>${field('password', 'Passwort zur Bestätigung', { type: 'password', autocomplete: 'current-password', extra: 'maxlength="200"', id: 'f-delete-password' })}${message}
 <button class="button button-danger" type="submit">Konto endgültig löschen</button></form></section>`),
     },
   };
@@ -209,7 +223,7 @@ ${field('password', 'Neues Passwort', { type: 'password', autocomplete: 'new-pas
     },
     async password(form, values) {
       const r = await api('password', { method: 'POST', body: { current: values.current, password: values.password } });
-      if (r.status === 401) { signedOut(); return show('anmelden'); }
+      if (r.status === 401) return sessionEnded();
       if (!r.ok) return setMessage(form, r.data.message || 'Das hat nicht geklappt.');
       form.reset();
       setMessage(form, r.data.message, true);
@@ -239,26 +253,34 @@ ${field('password', 'Neues Passwort', { type: 'password', autocomplete: 'new-pas
     if (!r.ok) { slot.innerHTML = '<p class="muted">Notizen konnten nicht geladen werden.</p>'; return; }
     const notes = r.data.notes || [];
     if (!notes.length) { slot.innerHTML = '<p class="muted">Noch keine. Im Stundenplan bei einer Vorlesung auf „Notiz“ tippen.</p>'; return; }
-    const fDate = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-    slot.innerHTML = `<ul class="note-list">${notes.map((n) => `<li><p class="note-list-head"><a href="?kurs=${encodeURIComponent(n.course)}" data-course-link="${esc(n.course)}">${esc(n.course)}</a> · ${esc(n.eventName || 'Termin')}${n.eventStart ? ` · ${esc(fDate.format(new Date(n.eventStart)))}` : ''}</p><p class="note-list-body">${esc(n.body)}</p></li>`).join('')}</ul>`;
+    slot.innerHTML = `<ul class="note-list">${notes.map((n) => `<li><p class="note-list-head"><a href="?kurs=${encodeURIComponent(n.course)}" data-course-link="${esc(n.course)}">${esc(n.course)}</a> · ${esc(n.eventName || 'Termin')}${n.eventStart ? ` · ${esc(fNoteDate.format(new Date(n.eventStart)))}` : ''}</p><p class="note-list-body">${esc(n.body)}</p></li>`).join('')}</ul>`;
   }
 
-  async function action(name) {
-    if (name === 'logout' || name === 'logout-all') {
-      await api(name, { method: 'POST', body: {} });
-      signedOut();
-      show('anmelden', { push: false });
-    } else if (name === 'export') {
-      const r = await api('export');
-      if (!r.ok) return;
-      const url = URL.createObjectURL(new Blob([JSON.stringify(r.data, null, 2)], { type: 'application/json' }));
-      const a = Object.assign(document.createElement('a'), { href: url, download: 'stundenplan-konto.json' });
-      document.body.append(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }
+  function download(name, data) {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: name });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+
+  // "logout" ends this session, "logout-all" every session of the account
+  async function signOut(action) {
+    await api(action, { method: 'POST', body: {} });
+    signedOut();
+    show('anmelden', { push: false });
+  }
+
+  // the buttons on the account page
+  const ACTIONS = {
+    logout: () => signOut('logout'),
+    'logout-all': () => signOut('logout-all'),
+    async export() {
+      const r = await api('export');
+      if (r.ok) download('stundenplan-konto.json', r.data);
+    },
+  };
 
   // one listener each for every view's forms and buttons
   document.addEventListener('submit', async (e) => {
@@ -296,7 +318,7 @@ ${field('password', 'Neues Passwort', { type: 'password', autocomplete: 'new-pas
       return;
     }
     const act = e.target.closest('[data-account-action]');
-    if (act) { action(act.dataset.accountAction); return; }
+    if (act) { ACTIONS[act.dataset.accountAction]?.(); return; }
     const note = e.target.closest('[data-note]');
     if (note) openNote(note.closest('.session'));
   });
@@ -304,7 +326,7 @@ ${field('password', 'Neues Passwort', { type: 'password', autocomplete: 'new-pas
   // ---------- notes on the timetable ----------
 
   async function courseShown(name) {
-    courseOpened(name);
+    saveCourse(name);
     if (!state.user) return decorate();
     if (state.notesCourse !== name) {
       state.notes.clear();
@@ -341,54 +363,59 @@ ${field('password', 'Neues Passwort', { type: 'password', autocomplete: 'new-pas
     });
   }
 
-  let dialog = null;
-  function openNote(session) {
-    if (!session || !state.user) return;
-    if (!dialog) {
-      dialog = document.createElement('dialog');
-      dialog.className = 'note-dialog';
-      dialog.setAttribute('aria-labelledby', 'note-title');
-      dialog.innerHTML = `<form class="note-form" data-note-form novalidate>
+  let dialog = null;  // one <dialog> for every note, built when first needed
+  let editing = null; // the lecture whose note is open: { id, session, name, start }
+
+  const countNote = () => { dialog.querySelector('[data-note-count]').textContent = `${[...dialog.querySelector('textarea').value].length} / ${MAX_NOTE}`; };
+
+  function buildDialog() {
+    const el = document.createElement('dialog');
+    el.className = 'note-dialog';
+    el.setAttribute('aria-labelledby', 'note-title');
+    el.innerHTML = `<form class="note-form" data-note-form novalidate>
 <p class="note-when" data-note-when></p><h2 class="note-title" id="note-title" data-note-title></h2>
 <label class="field-label" for="note-body">Deine Notiz (nur für dich sichtbar)</label>
-<textarea id="note-body" name="body" rows="6" maxlength="2000" placeholder="Hausaufgabe, Raumänderung, was mitbringen …"></textarea>
+<textarea id="note-body" name="body" rows="6" maxlength="${MAX_NOTE}" placeholder="Hausaufgabe, Raumänderung, was mitbringen …"></textarea>
 <p class="note-count" data-note-count aria-live="polite"></p>
 <p class="form-message" data-message role="alert" hidden></p>
 <div class="note-actions"><button class="button button-quiet" type="button" data-note-delete>Löschen</button><span></span>
 <button class="button button-quiet" type="button" data-note-cancel>Abbrechen</button><button class="button" type="submit">Speichern</button></div></form>`;
-      document.body.append(dialog);
-      const area = dialog.querySelector('textarea');
-      const count = () => { dialog.querySelector('[data-note-count]').textContent = `${[...area.value].length} / 2000`; };
-      area.addEventListener('input', count);
-      dialog.querySelector('[data-note-cancel]').addEventListener('click', () => dialog.close());
-      dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); }); // backdrop
-      dialog.querySelector('[data-note-delete]').addEventListener('click', () => saveNote(''));
-      dialog.querySelector('form').addEventListener('submit', (e) => { e.preventDefault(); saveNote(area.value); });
-      dialog.count = count;
-    }
+    document.body.append(el);
+    const area = el.querySelector('textarea');
+    area.addEventListener('input', countNote);
+    el.querySelector('[data-note-cancel]').addEventListener('click', () => el.close());
+    el.addEventListener('click', (e) => { if (e.target === el) el.close(); }); // backdrop
+    el.querySelector('[data-note-delete]').addEventListener('click', () => saveNote(''));
+    el.querySelector('form').addEventListener('submit', (e) => { e.preventDefault(); saveNote(area.value); });
+    return el;
+  }
+
+  function openNote(session) {
+    if (!session || !state.user) return;
+    dialog ??= buildDialog();
     const id = session.dataset.id;
     const note = state.notes.get(id);
-    dialog.target = { id, session, name: session.querySelector('.session-title').textContent, start: new Date(+session.dataset.start).toISOString() };
-    dialog.querySelector('[data-note-title]').textContent = dialog.target.name;
+    editing = { id, session, name: session.querySelector('.session-title').textContent, start: new Date(+session.dataset.start).toISOString() };
+    dialog.querySelector('[data-note-title]').textContent = editing.name;
     dialog.querySelector('[data-note-when]').textContent = `${session.closest('.day')?.querySelector('.day-name')?.textContent || ''}, ${session.querySelector('.session-time')?.textContent || ''}`;
     dialog.querySelector('textarea').value = note?.body || '';
     dialog.querySelector('[data-note-delete]').hidden = !note;
     setMessage(dialog.querySelector('form'), '');
-    dialog.count();
+    countNote();
     dialog.showModal();
     dialog.querySelector('textarea').focus();
   }
 
+  // an empty body deletes the note
   async function saveNote(body) {
-    const form = dialog.querySelector('form');
-    const t = dialog.target;
-    const r = await api('note', { method: 'PUT', body: { course: app.getCurrent(), eventId: t.id, eventName: t.name, eventStart: t.start, body } });
-    if (r.status === 401) { dialog.close(); signedOut(); return show('anmelden'); }
-    if (!r.ok) return setMessage(form, r.data.message || 'Speichern hat nicht geklappt.');
-    if (r.data.note) state.notes.set(t.id, r.data.note); else state.notes.delete(t.id);
+    const { id, session, name, start } = editing;
+    const r = await api('note', { method: 'PUT', body: { course: app.getCurrent(), eventId: id, eventName: name, eventStart: start, body } });
+    if (r.status === 401) { dialog.close(); return sessionEnded(); }
+    if (!r.ok) return setMessage(dialog.querySelector('form'), r.data.message || 'Speichern hat nicht geklappt.');
+    if (r.data.note) state.notes.set(id, r.data.note); else state.notes.delete(id);
     decorate();
     dialog.close();
-    t.session.querySelector('[data-note]')?.focus();
+    session.querySelector('[data-note]')?.focus();
   }
 
   // ---------- start ----------

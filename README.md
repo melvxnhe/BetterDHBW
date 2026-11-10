@@ -42,7 +42,7 @@ Das Repo ist fertig für Vercel, `vercel.json` stellt alles ein:
 
 - Die ganze laufende Theoriephase, auch die schon vergangenen Wochen (grau im Wochenwähler). Geöffnet wird die aktuelle Woche.
 - In der Praxisphase zeigt der Plan den nächsten Block, nach dem letzten Block den letzten. Ältere Blöcke stehen nur in der Kalenderdatei.
-- Unter dem Kürzel steht der volle Name, z. B. „Wirtschaftsinformatik – Software Engineering 26“. Studiengang aus api.dhbw.app, die Studienrichtung aus den Kürzeln der DHBW Mannheim (`TRACKS` in `src/render.js`); unbekannte Kürzel zeigen nur den Studiengang.
+- Unter dem Kürzel steht der volle Name, z. B. „Wirtschaftsinformatik – Software Engineering 26“. Studiengang aus api.dhbw.app, die Studienrichtung aus den Kürzeln der DHBW Mannheim (`TRACKS` in `src/catalog.js`); unbekannte Kürzel zeigen nur den Studiengang.
 
 ## Mensa
 
@@ -62,7 +62,7 @@ Das Repo ist fertig für Vercel, `vercel.json` stellt alles ein:
 Anmelden ist freiwillig; der Stundenplan geht ohne. Mit Konto sind Kurs und zuletzt geöffnete Kurse auf allen Geräten gleich, und zu jeder Vorlesung gibt es eine private Notiz.
 
 - Registrieren nur mit Adressen der DHBW Mannheim (`…@student.dhbw-mannheim.de`, `…@dhbw-mannheim.de`), bestätigt per E-Mail-Link. Passwort vergessen: Link per E-Mail.
-- Server: `api/account.js` → `api/_account.js` (alle Regeln), Datenbank `api/_db.js` (Neon Postgres; Tabellen legt sie beim ersten Aufruf selbst an, oder `npm run db:migrate`).
+- Server: `api/account.js` → `api/_account.js` (alle Regeln), mit `api/_password.js` (Passwörter), `api/_mail.js` (E-Mails) und der Datenbank `api/_db.js` (Neon Postgres; Tabellen legt sie beim ersten Aufruf selbst an, oder `npm run db:migrate`).
 - Seite: `src/account.js` (Anmelden, Registrieren, Konto, Notizen), Adressen `?konto=anmelden`, `?konto=registrieren`, `?konto=konto`.
 - Lokal (`npm start`) ohne `DATABASE_URL`: eine Postgres-Datenbank in `.data/` (PGlite), E-Mails erscheinen in der Konsole.
 - `npm test`: 18 Angriffstests gegen einen frischen Server (fremde Domains, schwache Passwörter, CSRF, SQL-Injection, fremde Notizen, Sperren, …).
@@ -97,10 +97,25 @@ Anmelden ist freiwillig; der Stundenplan geht ohne. Mit Konto sind Kurs und zule
 
 - `public/index.html`: die fertige Seite (CSS und JS eingebettet): Startseite, und jeder Kurs unter `?kurs=…`. Wird gebaut, nicht eingecheckt.
 - `dev.html`: nur zum Testen (lokal unter http://localhost:8137/dev.html), mit Worst-Case-Daten zum Umschalten. Liegt absichtlich nicht in `public/` und wird nicht deployt.
-- `api/`: die Weiterleitung zu api.dhbw.app als Vercel-Funktionen; `_dhbw.js` nutzt auch `serve.mjs`.
-- `vercel.json`: Build-Befehl und Ausgabeordner für Vercel.
-- `src/render.js`: baut aus Rapla-Daten das HTML (Startseite, Kursplan, Kalenderdatei), beim Build und im Browser.
-- `src/app.js`: Verhalten (Startseite, Kurssuche, Wochen, Filter, „läuft gerade“).
-- `src/styles.css`: Aussehen.
 - `build.mjs`: holt die Daten und baut alles. Nach Änderungen in `src/` neu ausführen.
-- `serve.mjs`: kleiner Server ohne Abhängigkeiten, mit Weiterleitung zu api.dhbw.app.
+- `serve.mjs`: kleiner lokaler Server: die gebaute Seite, die Weiterleitung zu api.dhbw.app und die Konten.
+- `vercel.json`: Build-Befehl, Ausgabeordner und Sicherheits-Header für Vercel.
+
+Der Server (`api/`, als Vercel-Funktionen; Dateien mit `_` sind geteilter Code, den auch `serve.mjs` nutzt):
+
+- `_dhbw.js`: die Weiterleitung zu api.dhbw.app; `courses.js`, `mensa.js`, `rapla/lectures/[id]/events.js` sind ihre drei Adressen.
+- `account.js` → `_account.js`: die Konten (Registrieren, Anmelden, Einstellungen, Notizen).
+- `_password.js`: Passwörter hashen und prüfen. `_mail.js`: die E-Mails und ihr Versand. `_db.js`: Datenbank und Tabellen. `_http.js`: Antworten und Grenzen, die beide Server gleich halten.
+
+Die Seite (`src/`). Im Browser läuft ein Skript, das der Build aus diesen Dateien zusammensetzt:
+
+- `render.js`: baut aus Rapla-Daten das HTML (Kursplan, Kalenderdatei, Mensa), beim Build und im Browser.
+- `app.js`: welche Ansicht zu sehen ist, Kurse laden und aktuell halten. Richtet die anderen ein:
+- `timetable.js`: der Plan auf dem Bildschirm (Wochen, Modulfilter, „läuft gerade“).
+- `search.js`: die Kurssuche. `mensa.js`: die Mensa-Karte. `pwa.js`: Installieren und Offline. `account.js`: Konten und Notizen.
+- `sw.js`: der Service Worker (eigene Datei, nicht Teil des Skripts).
+- `styles.css`: Aussehen.
+
+Nur für den Build:
+
+- `catalog.js`: die Kursliste (Kürzel, Studiengang, Studienrichtung). `home.js`: die Startseite. `page.js`: der Rahmen jeder Seite und die Content-Security-Policy. `dev.js`: die Testdaten für `dev.html`. `icon.mjs`: die App-Icons.

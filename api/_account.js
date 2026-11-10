@@ -5,12 +5,12 @@
 // what it returns: { status, body, cookies }.
 //
 // Security, in one place:
-// - Passwords: scrypt (N=2^15, r=8, p=1) with a random salt, compared in
-//   constant time; logins for unknown addresses spend the same time.
+// - Passwords (_password.js): scrypt with a random salt, compared in constant
+//   time; logins for unknown addresses spend the same time.
 // - Sessions: 32 random bytes in an HttpOnly, Secure, SameSite=Lax cookie
 //   with the __Host- prefix; the database only keeps a SHA-256 of it.
-// - E-mail links: single use, 24 h (sign-up) or 1 h (reset), token in the
-//   URL fragment so it never reaches a server log or a Referer header.
+// - E-mail links (_mail.js): single use, 24 h (sign-up) or 1 h (reset), token
+//   in the URL fragment so it never reaches a server log or a Referer header.
 // - CSRF: changes need JSON and an Origin (or Sec-Fetch-Site) of this site.
 // - No account enumeration: sign-up, reset and login answer the same whether
 //   an address is registered or not; lockouts count per address hash.
@@ -18,13 +18,11 @@
 // - Links are built from APP_URL / Vercel's production URL, never from the
 //   Host header, so a forged Host can't redirect a reset link.
 
-import { createHash, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
-import { promisify } from 'node:util';
+import { createHash, randomBytes } from 'node:crypto';
 import { q, configured } from './_db.js';
-
-const scrypt = promisify(scryptCb);
-const SCRYPT = { N: 2 ** 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
-const KEYLEN = 64;
+import { reply, fail, Problem, BAD_REQUEST } from './_http.js';
+import { hashPassword, checkPassword, checkLogin, passwordProblem } from './_password.js';
+import { sendMail, appUrl, MAILS } from './_mail.js';
 
 const COOKIE = '__Host-sid';
 const SESSION_DAYS = 30;
@@ -32,90 +30,24 @@ const VERIFY_HOURS = 24;
 const RESET_HOURS = 1;
 const MAX_NOTES = 1000;
 const MAX_NOTE = 2000;
+const MAX_TOKEN = 100; // anything longer is not one of ours
+const HOUR = 3600;
+const LOCKOUT = 15 * 60;
 
-export const ALLOWED_DOMAINS = (process.env.ALLOWED_EMAIL_DOMAINS || 'student.dhbw-mannheim.de,dhbw-mannheim.de')
+const ALLOWED_DOMAINS = (process.env.ALLOWED_EMAIL_DOMAINS || 'student.dhbw-mannheim.de,dhbw-mannheim.de')
   .split(',').map((d) => d.trim().toLowerCase()).filter(Boolean);
 
 const COURSE = /^[A-Z0-9-]{1,40}$/;
 const EVENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
-// ---------- small helpers ----------
-
 const sha256 = (s) => createHash('sha256').update(s).digest('base64url');
 const newToken = () => randomBytes(32).toString('base64url');
-const reply = (status, body, cookies = []) => ({ status, body, cookies });
-const fail = (status, error, message, extra = {}) => reply(status, { error, message, ...extra });
 
-class Problem extends Error {
-  constructor(status, error, message) { super(message); Object.assign(this, { status, error }); }
-}
+// ---------- what a request sent ----------
 
-function cookie(value, maxAge) {
-  return `${COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
-}
-const clearCookie = () => cookie('', 0);
-
-function readCookie(header) {
-  for (const part of String(header || '').split(';')) {
-    const [k, ...v] = part.trim().split('=');
-    if (k === COOKIE) return v.join('=');
-  }
-  return null;
-}
-
-// ---------- passwords ----------
-
-export async function hashPassword(password) {
-  const salt = randomBytes(16);
-  const key = await scrypt(password.normalize('NFKC'), salt, KEYLEN, SCRYPT);
-  return `scrypt$15$8$1$${salt.toString('base64url')}$${key.toString('base64url')}`;
-}
-
-export async function checkPassword(password, stored) {
-  const [alg, logN, r, p, salt, hash] = String(stored).split('$');
-  if (alg !== 'scrypt' || !salt || !hash) return false;
-  const expected = Buffer.from(hash, 'base64url');
-  const key = await scrypt(password.normalize('NFKC'), Buffer.from(salt, 'base64url'), expected.length,
-    { N: 2 ** Number(logN), r: Number(r), p: Number(p), maxmem: SCRYPT.maxmem });
-  return key.length === expected.length && timingSafeEqual(key, expected);
-}
-
-// a real hash to compare against when the address is unknown, so both cases take as long
-let dummy = null;
-const dummyHash = async () => (dummy ??= await hashPassword(newToken()));
-
-// Is the password in a known data breach? Have I Been Pwned's range API only
-// ever sees the first 5 characters of the SHA-1. If it can't be reached, the
-// check is skipped rather than blocking sign-ups.
-async function breached(password) {
-  try {
-    const sha1 = createHash('sha1').update(password).digest('hex').toUpperCase();
-    const res = await fetch(`https://api.pwnedpasswords.com/range/${sha1.slice(0, 5)}`, {
-      headers: { 'Add-Padding': 'true', 'User-Agent': 'dhbw-mannheim-stundenplan' }, signal: AbortSignal.timeout(2500),
-    });
-    if (!res.ok) return false;
-    const suffix = sha1.slice(5);
-    return (await res.text()).split('\n').some((line) => line.startsWith(suffix) && Number(line.split(':')[1]) > 0);
-  } catch {
-    return false;
-  }
-}
-
-async function passwordProblem(password, email) {
-  if (typeof password !== 'string') return 'Bitte ein Passwort eingeben.';
-  const length = [...password].length;
-  if (length < 10) return 'Das Passwort braucht mindestens 10 Zeichen.';
-  if (length > 200) return 'Das Passwort darf höchstens 200 Zeichen haben.';
-  if (email && password.trim().toLowerCase() === email) return 'Das Passwort darf nicht deine E-Mail-Adresse sein.';
-  if (await breached(password)) return 'Dieses Passwort taucht in bekannten Datenlecks auf. Bitte nimm ein anderes.';
-  return null;
-}
-
-// ---------- addresses ----------
-
-function normalEmail(value) {
-  return typeof value === 'string' ? value.trim().toLowerCase() : '';
-}
+const text = (value) => (typeof value === 'string' ? value : '');
+const normalEmail = (value) => text(value).trim().toLowerCase();
+const courseOf = (value) => text(value).toUpperCase();
 
 function emailProblem(email) {
   if (!/^[^\s@]{1,64}@[^\s@]{1,190}$/.test(email)) return 'Bitte eine gültige E-Mail-Adresse eingeben.';
@@ -124,108 +56,16 @@ function emailProblem(email) {
   return null;
 }
 
-// ---------- rate limits ----------
-
-// Counts a hit for `key` in a window of `seconds`; true while within `limit`.
-async function hit(key, limit, seconds) {
-  const [row] = await q(
-    `INSERT INTO rate_limits (key, count, reset_at) VALUES ($1, 1, now() + make_interval(secs => $2))
-     ON CONFLICT (key) DO UPDATE SET
-       count = CASE WHEN rate_limits.reset_at < now() THEN 1 ELSE rate_limits.count + 1 END,
-       reset_at = CASE WHEN rate_limits.reset_at < now() THEN now() + make_interval(secs => $2) ELSE rate_limits.reset_at END
-     RETURNING count`, [key, seconds]);
-  return row.count <= limit;
+// Ends the request with a 400 when a check found something to say.
+function valid(problem) {
+  if (problem) throw new Problem(400, 'invalid', problem);
 }
 
-async function count(key) {
-  const [row] = await q(`SELECT count FROM rate_limits WHERE key = $1 AND reset_at > now()`, [key]);
-  return row?.count || 0;
+// The hash of the token from an e-mail link.
+function linkHash(body) {
+  if (typeof body.token !== 'string' || body.token.length > MAX_TOKEN) throw new Problem(400, 'invalid-token', 'Dieser Link ist ungültig.');
+  return sha256(body.token);
 }
-
-const tooMany = () => fail(429, 'rate-limited', 'Zu viele Versuche. Bitte warte ein paar Minuten.');
-
-// ---------- e-mail ----------
-
-const escHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-async function sendMail(ctx, { to, subject, lines, link, linkLabel }) {
-  const text = [...lines, '', link ? `${linkLabel}: ${link}` : '', '', 'Stundenpläne der DHBW Mannheim (inoffiziell)'].join('\n');
-  const html = `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.5;color:#1d1d1f">${lines.map((l) => `<p>${escHtml(l)}</p>`).join('')}${link
-    ? `<p><a href="${escHtml(link)}" style="display:inline-block;padding:10px 16px;border-radius:10px;background:#1d1d1f;color:#fff;text-decoration:none">${escHtml(linkLabel)}</a></p><p style="color:#6e6e73;font-size:13px">Oder diesen Link öffnen: ${escHtml(link)}</p>`
-    : ''}<p style="color:#6e6e73;font-size:13px">Stundenpläne der DHBW Mannheim (inoffiziell)</p></div>`;
-
-  if (process.env.RESEND_API_KEY && process.env.MAIL_FROM) {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: process.env.MAIL_FROM, to: [to], subject, text, html }),
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) throw new Problem(502, 'mail-failed', 'Die E-Mail konnte gerade nicht verschickt werden. Bitte später noch einmal versuchen.');
-    return;
-  }
-  // SMTP, by default Gmail: SMTP_USER is the address, SMTP_PASS a Google app password
-  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-    const { createTransport } = await import('nodemailer');
-    const port = Number(process.env.SMTP_PORT || 465);
-    const transport = createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com', port, secure: port === 465, requireTLS: port !== 465,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS.replace(/\s+/g, '') }, // app passwords are shown with spaces
-      connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 10000,
-    });
-    try {
-      await transport.sendMail({ from: process.env.MAIL_FROM || `Stundenplan DHBW Mannheim <${process.env.SMTP_USER}>`, to, subject, text, html });
-    } catch (err) {
-      console.error('smtp', err.code || err.message);
-      throw new Problem(502, 'mail-failed', 'Die E-Mail konnte gerade nicht verschickt werden. Bitte später noch einmal versuchen.');
-    }
-    return;
-  }
-  if (ctx.dev) {
-    // local development: no mail service, the link goes to the server console
-    console.log(`\n[Mail an ${to}] ${subject}\n${text}\n`);
-    return;
-  }
-  throw new Problem(503, 'mail-not-configured', 'Der E-Mail-Versand ist noch nicht eingerichtet. Registrieren geht erst danach.');
-}
-
-// Where e-mail links point. Never derived from the request's Host header.
-function appUrl(ctx) {
-  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/+$/, '');
-  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
-  if (ctx.dev && ctx.origin) return ctx.origin;
-  throw new Problem(503, 'no-app-url', 'APP_URL ist nicht gesetzt.');
-}
-
-// ---------- sessions ----------
-
-async function startSession(userId) {
-  const token = newToken();
-  await q(`INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, now() + make_interval(days => $3))`,
-    [sha256(token), userId, SESSION_DAYS]);
-  return cookie(token, SESSION_DAYS * 86400);
-}
-
-// The signed-in user, or null. A session is extended (and its cookie renewed)
-// at most once a day, so an active user stays signed in.
-async function currentUser(headers) {
-  const token = readCookie(headers.cookie);
-  if (!token || token.length > 100) return { user: null, cookies: [] };
-  const hash = sha256(token);
-  const [row] = await q(
-    `SELECT u.id, u.email, u.settings, s.expires_at < now() + make_interval(days => $2) AS stale
-     FROM sessions s JOIN users u ON u.id = s.user_id
-     WHERE s.token_hash = $1 AND s.expires_at > now()`, [hash, SESSION_DAYS - 1]);
-  if (!row) return { user: null, cookies: [] };
-  const cookies = [];
-  if (row.stale) {
-    await q(`UPDATE sessions SET expires_at = now() + make_interval(days => $2) WHERE token_hash = $1`, [hash, SESSION_DAYS]);
-    cookies.push(cookie(token, SESSION_DAYS * 86400));
-  }
-  return { user: { id: row.id, email: row.email, settings: row.settings || {} }, cookies, hash };
-}
-
-// ---------- settings and notes ----------
 
 function cleanSettings(input) {
   const out = {};
@@ -235,10 +75,6 @@ function cleanSettings(input) {
   }
   return out;
 }
-
-const noteOut = (n) => ({ course: n.course, eventId: n.event_id, eventName: n.event_name, eventStart: n.event_start, body: n.body, updatedAt: n.updated_at });
-
-// ---------- the request ----------
 
 // Changes must come from this site: JSON (which a plain HTML form can't send)
 // and an Origin or Sec-Fetch-Site saying so.
@@ -253,6 +89,93 @@ function csrfProblem(headers) {
   return null;
 }
 
+// ---------- rate limits ----------
+
+// Counts a hit for `key` in a window of `seconds`; true while within `max`.
+async function hit(key, max, seconds) {
+  const [row] = await q(
+    `INSERT INTO rate_limits (key, count, reset_at) VALUES ($1, 1, now() + make_interval(secs => $2))
+     ON CONFLICT (key) DO UPDATE SET
+       count = CASE WHEN rate_limits.reset_at < now() THEN 1 ELSE rate_limits.count + 1 END,
+       reset_at = CASE WHEN rate_limits.reset_at < now() THEN now() + make_interval(secs => $2) ELSE rate_limits.reset_at END
+     RETURNING count`, [key, seconds]);
+  return row.count <= max;
+}
+
+// The same, ending the request with a 429 once the limit is passed.
+async function limit(key, max, seconds = HOUR) {
+  if (!(await hit(key, max, seconds))) throw new Problem(429, 'rate-limited', 'Zu viele Versuche. Bitte warte ein paar Minuten.');
+}
+
+async function hits(key) {
+  const [row] = await q(`SELECT count FROM rate_limits WHERE key = $1 AND reset_at > now()`, [key]);
+  return row?.count || 0;
+}
+
+const forget = (key) => q(`DELETE FROM rate_limits WHERE key = $1`, [key]);
+
+// failed logins count per address (hashed), so guessing locks the address, not the guesser's IP
+const failedLogins = (email) => `login:fail:${sha256(email)}`;
+
+// ---------- sessions ----------
+
+const cookie = (value, maxAge) => `${COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+const clearCookie = () => cookie('', 0);
+
+// The session token a request carries and its hash, or null.
+function sessionOf(headers) {
+  for (const part of String(headers.cookie || '').split(';')) {
+    const [k, ...v] = part.trim().split('=');
+    if (k !== COOKIE) continue;
+    const token = v.join('=');
+    return token && token.length <= MAX_TOKEN ? { token, hash: sha256(token) } : null;
+  }
+  return null;
+}
+
+async function startSession(userId) {
+  const token = newToken();
+  await q(`INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, now() + make_interval(days => $3))`,
+    [sha256(token), userId, SESSION_DAYS]);
+  return cookie(token, SESSION_DAYS * 86400);
+}
+
+// The answer to everything that signs someone in: who they are, their
+// settings, and a fresh session.
+const signedIn = async (user) => reply(200, { user: { email: user.email }, settings: user.settings || {} }, [await startSession(user.id)]);
+
+// The signed-in user, or null. A session is extended (and its cookie renewed)
+// at most once a day, so an active user stays signed in.
+async function currentUser(headers) {
+  const session = sessionOf(headers);
+  if (!session) return { user: null, cookies: [] };
+  const [row] = await q(
+    `SELECT u.id, u.email, u.settings, s.expires_at < now() + make_interval(days => $2) AS stale
+     FROM sessions s JOIN users u ON u.id = s.user_id
+     WHERE s.token_hash = $1 AND s.expires_at > now()`, [session.hash, SESSION_DAYS - 1]);
+  if (!row) return { user: null, cookies: [] };
+  const cookies = [];
+  if (row.stale) {
+    await q(`UPDATE sessions SET expires_at = now() + make_interval(days => $2) WHERE token_hash = $1`, [session.hash, SESSION_DAYS]);
+    cookies.push(cookie(session.token, SESSION_DAYS * 86400));
+  }
+  return { user: { id: row.id, email: row.email, settings: row.settings || {} }, cookies, hash: session.hash };
+}
+
+async function requireUser(headers) {
+  const session = await currentUser(headers);
+  if (!session.user) throw new Problem(401, 'signed-out', 'Bitte melde dich an.');
+  return session;
+}
+
+// Changing the password and deleting the account ask for the password again.
+async function confirmPassword(user, password, message) {
+  const [row] = await q(`SELECT password_hash FROM users WHERE id = $1`, [user.id]);
+  if (typeof password !== 'string' || !(await checkPassword(password, row.password_hash))) throw new Problem(403, 'wrong', message);
+}
+
+// ---------- the request ----------
+
 const ACTIONS = {
   me: 'GET', register: 'POST', verify: 'POST', login: 'POST', logout: 'POST', 'logout-all': 'POST',
   forgot: 'POST', reset: 'POST', password: 'POST', delete: 'POST', settings: 'PUT', notes: 'GET', note: 'PUT', export: 'GET',
@@ -265,7 +188,7 @@ export async function handleAccount({ method, action, query = {}, body = null, h
   if (method !== 'GET') {
     const problem = csrfProblem(headers);
     if (problem) return fail(403, 'forbidden', problem);
-    if (!body || typeof body !== 'object' || Array.isArray(body)) return fail(400, 'bad-request', 'Ungültige Anfrage.');
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return BAD_REQUEST;
   }
 
   try {
@@ -278,19 +201,14 @@ export async function handleAccount({ method, action, query = {}, body = null, h
   }
 }
 
+// what has expired, now and then (2 % of requests) instead of on a schedule
 async function cleanup() {
   await q(`DELETE FROM sessions WHERE expires_at < now()`);
   await q(`DELETE FROM tokens WHERE expires_at < now()`);
   await q(`DELETE FROM rate_limits WHERE reset_at < now() - interval '1 day'`);
 }
 
-async function requireUser(headers) {
-  const session = await currentUser(headers);
-  if (!session.user) throw new Problem(401, 'signed-out', 'Bitte melde dich an.');
-  return session;
-}
-
-const SENT = (email) => `Wenn ${email} registriert werden kann, ist eine E-Mail unterwegs. Der Link darin gilt 24 Stunden.`;
+const noteOut = (n) => ({ course: n.course, eventId: n.event_id, eventName: n.event_name, eventStart: n.event_start, body: n.body, updatedAt: n.updated_at });
 
 const ROUTES = {
   async me({ headers }) {
@@ -300,65 +218,61 @@ const ROUTES = {
 
   async register({ body, ip, ctx }) {
     const email = normalEmail(body.email);
-    const problem = emailProblem(email) || (await passwordProblem(body.password, email));
-    if (problem) return fail(400, 'invalid', problem);
-    // counted once the input is valid: what costs (and could be abused) is the mail
-    if (!(await hit(`register:ip:${ip}`, 10, 3600))) return tooMany();
+    valid(emailProblem(email) || (await passwordProblem(body.password, email)));
     // the same answer either way: whether an address has an account stays private
-    if (!(await hit(`register:mail:${sha256(email)}`, 3, 3600))) return reply(202, { ok: true, message: SENT(email) });
+    const sent = reply(202, { ok: true, message: `Wenn ${email} registriert werden kann, ist eine E-Mail unterwegs. Der Link darin gilt 24 Stunden.` });
+    // counted once the input is valid: what costs (and could be abused) is the mail
+    await limit(`register:ip:${ip}`, 10);
+    if (!(await hit(`register:mail:${sha256(email)}`, 3, HOUR))) return sent;
 
     // hashed in both cases, so the answer takes as long whether the address is taken or not
     const passwordHash = await hashPassword(body.password);
     const [existing] = await q(`SELECT id FROM users WHERE email = $1`, [email]);
     const app = appUrl(ctx);
     if (existing) {
-      await sendMail(ctx, { to: email, subject: 'Du hast schon ein Konto', linkLabel: 'Passwort zurücksetzen', link: `${app}/?konto=vergessen`,
-        lines: ['Jemand (vielleicht du) wollte sich mit dieser Adresse registrieren. Du hast aber schon ein Konto.', 'Passwort vergessen? Über den Link kannst du ein neues setzen. Warst du das nicht, kannst du die Mail ignorieren.'] });
-    } else {
-      // The account only comes into being when the link is opened, with the
-      // password from this sign-up: a stranger who signs up with your address
-      // first gets nothing unless you click their link.
-      const token = newToken();
-      await q(`INSERT INTO tokens (token_hash, kind, email, password_hash, expires_at) VALUES ($1, 'verify', $2, $3, now() + make_interval(hours => $4))`,
-        [sha256(token), email, passwordHash, VERIFY_HOURS]);
-      await sendMail(ctx, { to: email, subject: 'Bestätige dein Konto', linkLabel: 'Konto bestätigen', link: `${app}/?konto=bestaetigen#token=${token}`,
-        lines: ['Willkommen! Bestätige deine Adresse, dann ist dein Konto fertig und du bist angemeldet.', 'Der Link gilt 24 Stunden. Hast du dich nicht registriert, ignoriere diese Mail einfach.'] });
+      await sendMail(ctx, email, MAILS.taken(app));
+      return sent;
     }
-    return reply(202, { ok: true, message: SENT(email) });
+    // The account only comes into being when the link is opened, with the
+    // password from this sign-up: a stranger who signs up with your address
+    // first gets nothing unless you click their link.
+    const token = newToken();
+    await q(`INSERT INTO tokens (token_hash, kind, email, password_hash, expires_at) VALUES ($1, 'verify', $2, $3, now() + make_interval(hours => $4))`,
+      [sha256(token), email, passwordHash, VERIFY_HOURS]);
+    await sendMail(ctx, email, MAILS.verify(app, token));
+    return sent;
   },
 
   async verify({ body, ip }) {
-    if (!(await hit(`token:ip:${ip}`, 30, 3600))) return tooMany();
-    if (typeof body.token !== 'string' || body.token.length > 100) return fail(400, 'invalid-token', 'Dieser Link ist ungültig.');
+    await limit(`token:ip:${ip}`, 30);
     const [user] = await q(
       `WITH t AS (DELETE FROM tokens WHERE token_hash = $1 AND kind = 'verify' AND expires_at > now() RETURNING email, password_hash)
        INSERT INTO users (email, password_hash) SELECT email, password_hash FROM t
-       ON CONFLICT (email) DO NOTHING RETURNING id, email, settings`, [sha256(body.token)]);
+       ON CONFLICT (email) DO NOTHING RETURNING id, email, settings`, [linkHash(body)]);
     if (!user) return fail(400, 'invalid-token', 'Dieser Link ist abgelaufen oder wurde schon benutzt. Melde dich an oder registriere dich neu.');
     await q(`DELETE FROM tokens WHERE email = $1 AND kind = 'verify'`, [user.email]);
-    return reply(200, { user: { email: user.email }, settings: user.settings || {} }, [await startSession(user.id)]);
+    return signedIn(user);
   },
 
   async login({ body, ip }) {
-    if (!(await hit(`login:ip:${ip}`, 30, 900))) return tooMany();
+    await limit(`login:ip:${ip}`, 30, LOCKOUT);
     const email = normalEmail(body.email);
-    const password = typeof body.password === 'string' ? body.password.slice(0, 400) : '';
-    const failKey = `login:fail:${sha256(email)}`;
-    if ((await count(failKey)) >= 5) return fail(429, 'locked', 'Zu viele Fehlversuche für diese Adresse. Bitte in 15 Minuten noch einmal, oder setze dein Passwort zurück.');
+    const password = text(body.password).slice(0, 400);
+    const failed = failedLogins(email);
+    if ((await hits(failed)) >= 5) return fail(429, 'locked', 'Zu viele Fehlversuche für diese Adresse. Bitte in 15 Minuten noch einmal, oder setze dein Passwort zurück.');
 
     const [user] = email ? await q(`SELECT id, email, password_hash, settings FROM users WHERE email = $1`, [email]) : [];
-    const ok = user ? await checkPassword(password, user.password_hash) : (await checkPassword(password, await dummyHash()), false);
-    if (!ok) {
-      await hit(failKey, 5, 900);
+    if (!(await checkLogin(password, user?.password_hash))) {
+      await hit(failed, 5, LOCKOUT);
       return fail(401, 'wrong', 'E-Mail oder Passwort stimmt nicht. Gerade registriert? Dann zuerst den Link in der E-Mail öffnen.');
     }
-    await q(`DELETE FROM rate_limits WHERE key = $1`, [failKey]);
-    return reply(200, { user: { email: user.email }, settings: user.settings || {} }, [await startSession(user.id)]);
+    await forget(failed);
+    return signedIn(user);
   },
 
   async logout({ headers }) {
-    const token = readCookie(headers.cookie);
-    if (token && token.length <= 100) await q(`DELETE FROM sessions WHERE token_hash = $1`, [sha256(token)]);
+    const session = sessionOf(headers);
+    if (session) await q(`DELETE FROM sessions WHERE token_hash = $1`, [session.hash]);
     return reply(200, { ok: true }, [clearCookie()]);
   },
 
@@ -369,29 +283,26 @@ const ROUTES = {
   },
 
   async forgot({ body, ip, ctx }) {
-    if (!(await hit(`forgot:ip:${ip}`, 10, 3600))) return tooMany();
+    await limit(`forgot:ip:${ip}`, 10);
     const email = normalEmail(body.email);
-    const message = `Wenn es für ${email || 'diese Adresse'} ein Konto gibt, ist eine E-Mail mit einem Link unterwegs. Er gilt eine Stunde.`;
-    if (!email || !(await hit(`forgot:mail:${sha256(email)}`, 3, 3600))) return reply(202, { ok: true, message });
+    const sent = reply(202, { ok: true, message: `Wenn es für ${email || 'diese Adresse'} ein Konto gibt, ist eine E-Mail mit einem Link unterwegs. Er gilt eine Stunde.` });
+    if (!email || !(await hit(`forgot:mail:${sha256(email)}`, 3, HOUR))) return sent;
     const [user] = await q(`SELECT id FROM users WHERE email = $1`, [email]);
     if (user) {
       const token = newToken();
       await q(`INSERT INTO tokens (token_hash, kind, email, user_id, expires_at) VALUES ($1, 'reset', $2, $3, now() + make_interval(hours => $4))`,
         [sha256(token), email, user.id, RESET_HOURS]);
-      await sendMail(ctx, { to: email, subject: 'Neues Passwort setzen', linkLabel: 'Neues Passwort setzen', link: `${appUrl(ctx)}/?konto=passwort#token=${token}`,
-        lines: ['Über den Link setzt du ein neues Passwort. Danach bist du auf allen anderen Geräten abgemeldet.', 'Der Link gilt eine Stunde. Hast du das nicht angefordert, ignoriere diese Mail; dein Passwort bleibt, wie es ist.'] });
+      await sendMail(ctx, email, MAILS.reset(appUrl(ctx), token));
     }
-    return reply(202, { ok: true, message });
+    return sent;
   },
 
   async reset({ body, ip }) {
-    if (!(await hit(`token:ip:${ip}`, 30, 3600))) return tooMany();
-    if (typeof body.token !== 'string' || body.token.length > 100) return fail(400, 'invalid-token', 'Dieser Link ist ungültig.');
-    const hash = sha256(body.token);
+    await limit(`token:ip:${ip}`, 30);
+    const hash = linkHash(body);
     const [token] = await q(`SELECT email FROM tokens WHERE token_hash = $1 AND kind = 'reset' AND expires_at > now()`, [hash]);
     if (!token) return fail(400, 'invalid-token', 'Dieser Link ist abgelaufen oder wurde schon benutzt. Fordere einfach einen neuen an.');
-    const problem = await passwordProblem(body.password, token.email);
-    if (problem) return fail(400, 'invalid', problem);
+    valid(await passwordProblem(body.password, token.email));
     // token used up, password changed and every session ended, in one statement
     const [user] = await q(
       `WITH t AS (DELETE FROM tokens WHERE token_hash = $1 AND kind = 'reset' AND expires_at > now() RETURNING user_id),
@@ -400,19 +311,15 @@ const ROUTES = {
             o AS (DELETE FROM tokens WHERE kind = 'reset' AND user_id IN (SELECT id FROM u))
        SELECT id, email, settings FROM u`, [hash, await hashPassword(body.password)]);
     if (!user) return fail(400, 'invalid-token', 'Dieser Link ist abgelaufen oder wurde schon benutzt.');
-    await q(`DELETE FROM rate_limits WHERE key = $1`, [`login:fail:${sha256(user.email)}`]);
-    return reply(200, { user: { email: user.email }, settings: user.settings || {} }, [await startSession(user.id)]);
+    await forget(failedLogins(user.email));
+    return signedIn(user);
   },
 
   async password({ body, headers }) {
     const { user, hash } = await requireUser(headers);
-    if (!(await hit(`password:user:${user.id}`, 10, 3600))) return tooMany();
-    const [row] = await q(`SELECT password_hash FROM users WHERE id = $1`, [user.id]);
-    if (typeof body.current !== 'string' || !(await checkPassword(body.current, row.password_hash))) {
-      return fail(403, 'wrong', 'Das aktuelle Passwort stimmt nicht.');
-    }
-    const problem = await passwordProblem(body.password, user.email);
-    if (problem) return fail(400, 'invalid', problem);
+    await limit(`password:user:${user.id}`, 10);
+    await confirmPassword(user, body.current, 'Das aktuelle Passwort stimmt nicht.');
+    valid(await passwordProblem(body.password, user.email));
     await q(`UPDATE users SET password_hash = $2, password_changed_at = now() WHERE id = $1`, [user.id, await hashPassword(body.password)]);
     await q(`DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2`, [user.id, hash]); // other devices are signed out
     return reply(200, { ok: true, message: 'Passwort geändert. Auf anderen Geräten bist du jetzt abgemeldet.' });
@@ -420,11 +327,8 @@ const ROUTES = {
 
   async delete({ body, headers }) {
     const { user } = await requireUser(headers);
-    if (!(await hit(`delete:user:${user.id}`, 10, 3600))) return tooMany();
-    const [row] = await q(`SELECT password_hash FROM users WHERE id = $1`, [user.id]);
-    if (typeof body.password !== 'string' || !(await checkPassword(body.password, row.password_hash))) {
-      return fail(403, 'wrong', 'Das Passwort stimmt nicht.');
-    }
+    await limit(`delete:user:${user.id}`, 10);
+    await confirmPassword(user, body.password, 'Das Passwort stimmt nicht.');
     await q(`DELETE FROM tokens WHERE email = $1`, [user.email]);
     await q(`DELETE FROM users WHERE id = $1`, [user.id]); // sessions, notes and reset links go with it
     return reply(200, { ok: true }, [clearCookie()]);
@@ -440,7 +344,7 @@ const ROUTES = {
 
   async notes({ query, headers }) {
     const { user, cookies } = await requireUser(headers);
-    const course = typeof query.course === 'string' ? query.course.toUpperCase() : '';
+    const course = courseOf(query.course);
     if (course && !COURSE.test(course)) return fail(400, 'invalid', 'Ungültiger Kurs.');
     const rows = course
       ? await q(`SELECT * FROM notes WHERE user_id = $1 AND course = $2 ORDER BY event_start NULLS LAST`, [user.id, course])
@@ -448,31 +352,33 @@ const ROUTES = {
     return reply(200, { notes: rows.map(noteOut) }, cookies);
   },
 
+  // one note per lecture; saving an empty one deletes it
   async note({ body, headers }) {
     const { user, cookies } = await requireUser(headers);
-    if (!(await hit(`note:user:${user.id}`, 300, 3600))) return tooMany();
-    const course = typeof body.course === 'string' ? body.course.toUpperCase() : '';
+    await limit(`note:user:${user.id}`, 300);
+    const course = courseOf(body.course);
     const eventId = typeof body.eventId === 'string' || typeof body.eventId === 'number' ? String(body.eventId) : '';
     if (!COURSE.test(course) || !EVENT_ID.test(eventId)) return fail(400, 'invalid', 'Ungültiger Termin.');
-    const text = typeof body.body === 'string' ? body.body.replace(/\r\n?/g, '\n').trim() : '';
-    if ([...text].length > MAX_NOTE) return fail(400, 'invalid', `Eine Notiz darf höchstens ${MAX_NOTE} Zeichen haben.`);
+    const note = text(body.body).replace(/\r\n?/g, '\n').trim();
+    if ([...note].length > MAX_NOTE) return fail(400, 'invalid', `Eine Notiz darf höchstens ${MAX_NOTE} Zeichen haben.`);
 
-    if (!text) {
+    if (!note) {
       await q(`DELETE FROM notes WHERE user_id = $1 AND course = $2 AND event_id = $3`, [user.id, course, eventId]);
       return reply(200, { note: null }, cookies);
     }
-    const name = typeof body.eventName === 'string' ? body.eventName.slice(0, 300) : '';
+    const name = text(body.eventName).slice(0, 300);
     const start = typeof body.eventStart === 'string' && !Number.isNaN(Date.parse(body.eventStart)) ? new Date(body.eventStart).toISOString() : null;
-    const [n] = await q(
+    // a new note only while the person is under the limit; an existing one can always be changed
+    const [saved] = await q(
       `INSERT INTO notes (user_id, course, event_id, event_name, event_start, body)
        SELECT $1::uuid, $2::text, $3::text, $4::text, $5::timestamptz, $6::text
        WHERE (SELECT count(*) FROM notes WHERE user_id = $1::uuid) < $7::int
           OR EXISTS (SELECT 1 FROM notes WHERE user_id = $1::uuid AND course = $2::text AND event_id = $3::text)
        ON CONFLICT (user_id, course, event_id) DO UPDATE SET body = EXCLUDED.body, event_name = EXCLUDED.event_name,
          event_start = EXCLUDED.event_start, updated_at = now()
-       RETURNING *`, [user.id, course, eventId, name, start, text, MAX_NOTES]);
-    if (!n) return fail(400, 'too-many', `Du hast schon ${MAX_NOTES} Notizen. Lösche erst ein paar alte.`);
-    return reply(200, { note: noteOut(n) }, cookies);
+       RETURNING *`, [user.id, course, eventId, name, start, note, MAX_NOTES]);
+    if (!saved) return fail(400, 'too-many', `Du hast schon ${MAX_NOTES} Notizen. Lösche erst ein paar alte.`);
+    return reply(200, { note: noteOut(saved) }, cookies);
   },
 
   // everything stored about you, as JSON (Art. 15/20 DSGVO)
