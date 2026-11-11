@@ -5,15 +5,18 @@ import { createHash } from 'node:crypto';
 
 export const ICON_CAL = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M5 1a.75.75 0 0 1 .75.75V3h4.5V1.75a.75.75 0 0 1 1.5 0V3H13a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h1.25V1.75A.75.75 0 0 1 5 1ZM2.5 7v6c0 .28.22.5.5.5h10a.5.5 0 0 0 .5-.5V7h-11Z"/></svg>';
 export const ICON_USER = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5a3.25 3.25 0 1 1 0 6.5 3.25 3.25 0 0 1 0-6.5ZM8 3a1.75 1.75 0 1 0 0 3.5A1.75 1.75 0 0 0 8 3ZM2.5 13.25C2.5 10.9 4.9 9.5 8 9.5s5.5 1.4 5.5 3.75v.5a.75.75 0 0 1-1.5 0v-.5C12 11.95 10.4 11 8 11s-4 .95-4 2.25v.5a.75.75 0 0 1-1.5 0v-.5Z"/></svg>';
+export const ICON_SETTINGS = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M2.5 4.5h5.75m3.5 0h1.75M2.5 11.5h1.75m3.5 0h5.75"/><circle cx="10" cy="4.5" r="1.75" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="6" cy="11.5" r="1.75" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
 export const ICON_SEARCH = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M7 1.5a5.5 5.5 0 0 1 4.38 8.82l3.15 3.15a.75.75 0 1 1-1.06 1.06l-3.15-3.15A5.5 5.5 0 1 1 7 1.5ZM3 7a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z"/></svg>';
 
 // - main, foot: the homepage's markup (the view the page starts with)
 // - data: what the script reads from #course-data (every course, the preview's events)
 // - css, script: inlined, so the page is one request
+// - theme: src/theme.js, run in <head> so the saved theme applies before the
+//   first paint (after the theme-color metas, which it may change)
 // - head, tail: extra markup for dev.html
 // "#top" (the footer's "Nach oben") is the body: the header is sticky, so a
 // link to it would never scroll, it always counts as being on screen.
-export const pageHTML = ({ title, css, script, main, foot, data, head = '', tail = '' }) => `<!doctype html>
+export const pageHTML = ({ title, css, script, theme, main, foot, data, head = '', tail = '' }) => `<!doctype html>
 <html lang="de" class="no-js">
 <head>
 <meta charset="utf-8">
@@ -31,6 +34,9 @@ export const pageHTML = ({ title, css, script, main, foot, data, head = '', tail
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f5f7">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
 <meta name="color-scheme" content="light dark">
+<script>
+${theme}
+</script>
 <style>
 ${css}
 </style>
@@ -49,6 +55,7 @@ ${head}
 <div class="bar-actions">
 <a class="button" href="#" download data-ics>${ICON_CAL}<span class="button-label">Kalender laden</span></a>
 <a class="button button-quiet" href="?konto" data-account-link hidden>${ICON_USER}<span class="button-label" data-account-label>Anmelden</span></a>
+<button class="button button-quiet settings-button" type="button" popovertarget="settings" aria-label="Einstellungen" title="Einstellungen" data-settings-button>${ICON_SETTINGS}</button>
 </div>
 </div></header>
 <main>

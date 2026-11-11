@@ -50,6 +50,13 @@ Das Repo ist fertig für Vercel, `vercel.json` stellt alles ein:
 - Heute und die nächsten Tage mit Speiseplan (fünf insgesamt), geöffnet wird heute. Nach 14:00 steht dabei, dass die Ausgabe schon geschlossen hat.
 - Daten vom Studierendenwerk über api.dhbw.app (`/api/mensa`, auf Metropol gekürzt), stündlich neu geladen.
 
+## Einstellungen
+
+- Der Knopf rechts oben (Schieberegler) öffnet die Einstellungen: Darstellung „Automatisch“ (wie das Gerät), „Hell“ oder „Dunkel“, und eine Akzentfarbe (Rot, Blau, Grün, Lila, Orange) für heute, was gerade läuft und die Prüfungen. Fehler und Löschen bleiben rot.
+- Gespeichert auf dem Gerät (localStorage), nicht im Konto: Handy und Laptop können verschieden aussehen. Andere offene Tabs ziehen sofort nach.
+- `src/theme.js` setzt die Wahl schon im `<head>` (vor dem ersten Bild, also kein weißes Aufblitzen im Dunkelmodus); `src/settings.js` ist der Knopf mit dem Fenster. Die Farben stehen in `styles.css` als `light-dark()`-Paare, die Akzente unter `[data-accent]`.
+- Der Adminbereich folgt der Einstellung nicht, nur dem Gerät.
+
 ## App und offline
 
 - Installierbar (PWA): in Chrome und Edge über „App installieren“ (auch der Knopf auf der Startseite), auf dem iPhone über Teilen → „Zum Home-Bildschirm“.
@@ -139,7 +146,8 @@ Die Seite (`src/`). Im Browser läuft ein Skript, das der Build aus diesen Datei
 - `render.js`: baut aus Rapla-Daten das HTML (Kursplan, Kalenderdatei, Mensa), beim Build und im Browser.
 - `app.js`: welche Ansicht zu sehen ist, Kurse laden und aktuell halten. Richtet die anderen ein:
 - `timetable.js`: der Plan auf dem Bildschirm (Wochen, Modulfilter, „läuft gerade“).
-- `search.js`: die Kurssuche. `mensa.js`: die Mensa-Karte. `pwa.js`: Installieren und Offline. `chat.js`: der Chat. `account.js`: Konten und Notizen.
+- `search.js`: die Kurssuche. `mensa.js`: die Mensa-Karte. `pwa.js`: Installieren und Offline. `chat.js`: der Chat. `settings.js`: die Einstellungen. `account.js`: Konten und Notizen.
+- `theme.js`: setzt Hell/Dunkel und Akzent vor dem ersten Bild (eigenes Skript im `<head>`, nicht Teil des Seitenskripts).
 - `sw.js`: der Service Worker (eigene Datei, nicht Teil des Skripts).
 - `styles.css`: Aussehen.
 

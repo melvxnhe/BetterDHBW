@@ -2,7 +2,8 @@
 // account page), opening courses in place, and keeping what is shown in step
 // with the clock and with Rapla. The parts live in their own files and are
 // set up here: timetable.js (a plan's live state), search.js, mensa.js,
-// pwa.js (install and offline), chat.js, account.js. render.js makes the markup.
+// pwa.js (install and offline), chat.js, settings.js (the theme), account.js.
+// render.js makes the markup.
 //
 // build.mjs joins these files into one script in the page; this one runs last.
 (() => {
@@ -296,6 +297,8 @@
   const combobox = setupSearch({ courses, byName, recent, current: () => current, open: loadCourse });
   const headerInput = document.getElementById('course-search');
   if (headerInput) combobox(headerInput, document.getElementById('course-list'));
+
+  setupSettings();
 
   const chat = setupChat({ recent, current: () => current });
 

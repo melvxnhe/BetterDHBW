@@ -63,15 +63,21 @@ const events = normalize(raw);
 // The page's script: these files in this order, in one scope. render.js runs
 // in the browser too (same code, without the module syntax); the others each
 // define one setup function, and app.js, last, calls them.
-const SCRIPTS = ['render.js', 'timetable.js', 'search.js', 'mensa.js', 'pwa.js', 'chat.js', 'account.js', 'app.js'];
+const SCRIPTS = ['render.js', 'timetable.js', 'search.js', 'mensa.js', 'pwa.js', 'chat.js', 'settings.js', 'account.js', 'app.js'];
 const script = `(() => {\n${SCRIPTS.map((name) => source(name).replace(/^export /gm, '')).join('\n')}\n})();`;
 // The files only meet here, so this is where a name declared twice or a typo
 // shows up: better a failed build than a page whose script doesn't start.
 new Script(script, { filename: 'the page script (src/*.js joined)' });
 
+// theme.js runs on its own in <head> (before the first paint); its functions
+// are global, and settings.js in the page script uses them.
+const theme = source('theme.js');
+new Script(theme, { filename: 'src/theme.js' });
+
 const page = {
   css: source('styles.css'),
   script,
+  theme,
   main: homeHTML(courses, { sample: course.name, sampleEvents: events, now: builtAt }),
   foot: homeFooterHTML(courses, { builtAt }),
   // what the script reads: every course, and the preview's events (only the fields it uses)

@@ -2,33 +2,46 @@
    transform/opacity only, strong custom curves, UI under 300ms,
    hover gated to fine pointers, reduced motion = fades, not zero. */
 
+/* Colours. Each token holds its light and its dark value (light-dark()); which
+   one applies follows color-scheme: the device's setting, unless the person
+   picked "Hell" or "Dunkel" in the settings (data-theme on <html>, set before
+   the first paint by the script in <head>, see src/page.js). The accent
+   (today, "now", exams) can be changed too (data-accent); red for errors and
+   deleting (--danger) stays red whatever the accent. */
 :root {
   color-scheme: light dark;
 
-  --bg: #f5f5f7;
-  --surface: #ffffff;
-  --surface-2: #e8e8ed;
-  --text: #1d1d1f;
-  --muted: #6e6e73;
-  --hairline: rgb(0 0 0 / 0.08);
-  --accent: #d70015;
-  --accent-fill: #d70015;
-  --accent-soft: rgb(215 0 21 / 0.08);
+  --bg: light-dark(#f5f5f7, #000000);
+  --surface: light-dark(#ffffff, #1c1c1e);
+  --surface-2: light-dark(#e8e8ed, #2c2c2e);
+  --text: light-dark(#1d1d1f, #f5f5f7);
+  --muted: light-dark(#6e6e73, #98989d);
+  --hairline: light-dark(rgb(0 0 0 / 0.08), rgb(255 255 255 / 0.1));
+  --focus: light-dark(#0071e3, #409cff);
+
+  /* the accent: red unless another was picked (below) */
+  --accent: light-dark(#d70015, #ff6961);
+  --accent-fill: light-dark(#d70015, #c9101f);
+  --accent-soft: light-dark(rgb(215 0 21 / 0.08), rgb(255 69 58 / 0.14));
   --on-accent: #ffffff;
 
-  /* module colours, most frequent module first; red stays reserved for exams and "now" */
-  --m0: #0071e3;
-  --m1: #248a3d;
-  --m2: #c93400;
-  --m3: #8944ab;
-  --m4: #0a7a8f;
-  --m5: #b4237a;
-  --m6: #8a6d3b;
-  --m7: #3e4ccf;
-  --m8: #a07800;
-  --m9: #5f7d1a;
-  --m-misc: #8e8e93;
-  --focus: #0071e3;
+  /* errors and deleting */
+  --danger: light-dark(#d70015, #ff6961);
+  --danger-fill: light-dark(#d70015, #c9101f);
+  --danger-soft: light-dark(rgb(215 0 21 / 0.08), rgb(255 69 58 / 0.14));
+
+  /* module colours, most frequent module first */
+  --m0: light-dark(#0071e3, #409cff);
+  --m1: light-dark(#248a3d, #30d158);
+  --m2: light-dark(#c93400, #ff9f0a);
+  --m3: light-dark(#8944ab, #bf5af2);
+  --m4: light-dark(#0a7a8f, #5ac8fa);
+  --m5: light-dark(#b4237a, #ff6ab0);
+  --m6: light-dark(#8a6d3b, #c4a46a);
+  --m7: light-dark(#3e4ccf, #7d8cff);
+  --m8: light-dark(#a07800, #ffd60a);
+  --m9: light-dark(#5f7d1a, #a8d14f);
+  --m-misc: light-dark(#8e8e93, #98989d);
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
@@ -38,33 +51,42 @@
   --page: 1200px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #000000;
-    --surface: #1c1c1e;
-    --surface-2: #2c2c2e;
-    --text: #f5f5f7;
-    --muted: #98989d;
-    --hairline: rgb(255 255 255 / 0.1);
-    --accent: #ff6961;
-    --accent-fill: #c9101f;
-    --accent-soft: rgb(255 69 58 / 0.14);
-    --on-accent: #ffffff;
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
 
-    --m0: #409cff;
-    --m1: #30d158;
-    --m2: #ff9f0a;
-    --m3: #bf5af2;
-    --m4: #5ac8fa;
-    --m5: #ff6ab0;
-    --m6: #c4a46a;
-    --m7: #7d8cff;
-    --m8: #ffd60a;
-    --m9: #a8d14f;
-    --m-misc: #98989d;
-    --focus: #409cff;
-  }
+/* Accents to pick from. Each keeps text readable on the page (4.5:1) and
+   white readable on its fill, in light and in dark. They apply wherever
+   data-accent is set: on <html> for the page, and on each swatch in the
+   settings, which so shows its own colour. */
+[data-accent="red"] {
+  --accent: light-dark(#d70015, #ff6961);
+  --accent-fill: light-dark(#d70015, #c9101f);
+  --accent-soft: light-dark(rgb(215 0 21 / 0.08), rgb(255 69 58 / 0.14));
 }
+[data-accent="blue"] {
+  --accent: light-dark(#0066cc, #409cff);
+  --accent-fill: #0071e3;
+  --accent-soft: light-dark(rgb(0 113 227 / 0.08), rgb(64 156 255 / 0.16));
+}
+[data-accent="green"] {
+  --accent: light-dark(#1a7f37, #30d158);
+  --accent-fill: #248a3d;
+  --accent-soft: light-dark(rgb(36 138 61 / 0.09), rgb(48 209 88 / 0.14));
+}
+[data-accent="purple"] {
+  --accent: light-dark(#8944ab, #bf5af2);
+  --accent-fill: #8944ab;
+  --accent-soft: light-dark(rgb(137 68 171 / 0.09), rgb(191 90 242 / 0.16));
+}
+[data-accent="orange"] {
+  --accent: light-dark(#c93400, #ff9f0a);
+  --accent-fill: #c93400;
+  --accent-soft: light-dark(rgb(201 52 0 / 0.08), rgb(255 159 10 / 0.15));
+}
+
+/* While the theme changes, nothing transitions: every colour switches in the
+   same frame instead of chips and buttons fading after the rest. */
+.theme-switching *, .theme-switching *::before, .theme-switching *::after { transition: none !important; }
 
 /* ---------- base / mobile-native baseline ---------- */
 
@@ -1326,7 +1348,7 @@ body[data-view="home"] .foot {
 /* ---------- accounts: header link, forms, the account page ---------- */
 
 .button-quiet { background: var(--surface-2); color: var(--text); }
-.button-danger { background: var(--accent-fill); color: var(--on-accent); }
+.button-danger { background: var(--danger-fill); color: #ffffff; }
 .button-wide { justify-content: center; width: 100%; min-height: 44px; font-size: 0.9375rem; }
 .button[aria-busy="true"] { opacity: 0.55; pointer-events: none; }
 .button[hidden] { display: none; }
@@ -1395,8 +1417,8 @@ body[data-view="home"] .foot {
   padding: 10px 14px;
   overflow-wrap: anywhere; /* it can quote a long address back */
   border-radius: 12px;
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--danger-soft);
+  color: var(--danger);
   font-size: 0.9375rem;
   line-height: 1.45;
 }
@@ -1776,4 +1798,100 @@ body.has-chat .foot { padding-bottom: 96px; }
   .chat-panel { transform: none; transition: opacity 120ms ease, visibility 0s linear 120ms; }
   .chat.is-open .chat-panel { transition: opacity 150ms ease, visibility 0s; }
   .chat-fab:active, .chat-close:active, .chat-send:active { transform: none; }
+}
+
+/* ---------- settings: the header button and its panel ---------- */
+
+.settings-button { width: 36px; padding: 0; justify-content: center; }
+.bar-actions .settings-button { padding-inline: 0; } /* stays round where the header squeezes the others */
+
+/* without the head script (JavaScript off) nothing could change the theme */
+:root:not([data-theme]) .settings-button { display: none; }
+
+/* A popover of the button: it grows out of the button's corner in 180ms and
+   leaves faster; with the keyboard it is simply there (.is-instant). */
+.settings {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(300px, calc(100vw - 16px));
+  padding: 16px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--hairline), 0 16px 40px rgb(0 0 0 / 0.22);
+  transform-origin: top right;
+  opacity: 0;
+  transform: scale(0.96);
+  transition: opacity 120ms ease, transform 120ms ease, overlay 120ms allow-discrete, display 120ms allow-discrete;
+}
+
+.settings:popover-open {
+  opacity: 1;
+  transform: none;
+  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out), overlay 180ms allow-discrete, display 180ms allow-discrete;
+}
+
+@starting-style {
+  .settings:popover-open { opacity: 0; transform: scale(0.96); }
+}
+
+.settings.is-instant, .settings.is-instant:popover-open { transition: none; }
+
+.settings-title { margin-bottom: 14px; font-size: 1.0625rem; font-weight: 650; letter-spacing: -0.01em; }
+.settings-group { min-width: 0; margin: 0; padding: 0; border: 0; }
+.settings-group + .settings-group { margin-top: 18px; }
+.settings-label { margin-bottom: 8px; padding: 0; color: var(--muted); font-size: 0.8125rem; font-weight: 600; }
+.settings-hint { margin-top: 6px; color: var(--muted); font-size: 0.75rem; line-height: 1.4; }
+
+/* three options in one track; the chosen one is a raised tab */
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  padding: 2px;
+  border-radius: 11px;
+  background: var(--surface-2);
+}
+
+.segmented label { position: relative; display: grid; }
+.segmented input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+
+.segmented span {
+  display: grid;
+  place-items: center;
+  min-height: 34px;
+  padding: 0 6px;
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.segmented input:checked + span { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / 0.14); }
+.segmented input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.swatch {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--accent);
+  transition: transform 160ms var(--ease-out);
+}
+
+.swatch:active { transform: scale(0.95); }
+.swatch input { position: absolute; inset: 0; margin: 0; border-radius: 50%; opacity: 0; cursor: pointer; }
+/* the chosen one gets a ring in its own colour, with a gap of the panel's */
+.swatch:has(input:checked) { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+.swatch:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 5px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .settings, .settings:popover-open { transform: none; }
+  @starting-style { .settings:popover-open { transform: none; } }
+  .swatch:active { transform: none; }
 }
