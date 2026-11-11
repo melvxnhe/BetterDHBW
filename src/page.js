@@ -11,6 +11,8 @@ export const ICON_SEARCH = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fi
 // - data: what the script reads from #course-data (every course, the preview's events)
 // - css, script: inlined, so the page is one request
 // - head, tail: extra markup for dev.html
+// "#top" (the footer's "Nach oben") is the body: the header is sticky, so a
+// link to it would never scroll, it always counts as being on screen.
 export const pageHTML = ({ title, css, script, main, foot, data, head = '', tail = '' }) => `<!doctype html>
 <html lang="de" class="no-js">
 <head>
@@ -34,8 +36,8 @@ ${css}
 </style>
 ${head}
 </head>
-<body data-view="home">
-<header class="bar" id="top"><div class="wrap bar-inner">
+<body id="top" data-view="home">
+<header class="bar"><div class="wrap bar-inner">
 <a class="brand" href="./" data-home><strong data-course-name>Stundenplan</strong><span>DHBW Mannheim</span></a>
 <div class="search" role="search">
 <label class="search-field">${ICON_SEARCH}<span class="visually-hidden">Kurs suchen</span>

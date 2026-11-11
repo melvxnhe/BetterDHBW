@@ -27,7 +27,10 @@ const TITLE = 'Stundenpläne der DHBW Mannheim';
 const arg = (name) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : null; };
 const COURSE = (arg('--course') || 'WWI26SEA').toUpperCase().replace(/^MA-+/, '');
 const offline = process.argv.includes('--offline');
-const source = (name) => readFileSync(`src/${name}`, 'utf8');
+// LF only: browsers turn CRLF into LF before hashing an inline script or style,
+// so a file with Windows line endings would no longer match its CSP hash and
+// the page would load without CSS and JS.
+const source = (name) => readFileSync(`src/${name}`, 'utf8').replace(/\r\n?/g, '\n');
 
 // ---------- the data: every course, and the events of the one in the preview ----------
 
