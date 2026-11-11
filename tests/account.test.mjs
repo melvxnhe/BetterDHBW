@@ -208,3 +208,9 @@ test('pages carry the security headers', async () => {
   const api = await fetch(`${BASE}/api/account/me`);
   assert.equal(api.headers.get('cache-control'), 'no-store');
 });
+
+test('without ADMIN_PASSWORD_HASH there is no admin area at all', async () => {
+  assert.equal((await fetch(`${BASE}/admin`)).status, 404);
+  assert.equal((await person().admin('login', { password: 'egal was hier steht' })).status, 404);
+  assert.equal((await person().admin('overview')).status, 404);
+});

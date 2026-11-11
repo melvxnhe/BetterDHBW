@@ -15,14 +15,15 @@
 // - Sending needs JSON from this site (CSRF) and is rate-limited per sender
 //   and per IP. Reading is open, carries nothing about the reader, and may
 //   be cached for two seconds, so many readers polling a room cost one query.
-// - Messages go after 30 days; deleting an account deletes its messages.
+// - Messages go after 30 days; deleting an account deletes its messages. An
+//   admin can delete messages and stop a sender from writing (_admin.js).
 
 import { q, configured } from './_db.js';
 import { api, reply, fail, Problem } from './_http.js';
 import { sha256, numberOf, currentUser, guestOf, newGuest } from './_session.js';
 import { limit } from './_limits.js';
 
-const GUESTS = String(process.env.CHAT_GUESTS || '').toLowerCase() !== 'off';
+export const GUESTS = String(process.env.CHAT_GUESTS || '').toLowerCase() !== 'off';
 const GLOBAL = 'global';
 const COURSE = /^[A-Z0-9-]{1,40}$/; // upper case, so no course can be called "global"
 const MAX_MESSAGE = 500;
@@ -108,6 +109,8 @@ const ROUTES = {
     const text = cleanMessage(body.body);
     const from = await sender(headers, { create: true });
     if (!from) return fail(401, 'signed-out', 'Bitte melde dich an, um zu schreiben.');
+    const [banned] = await q(`SELECT 1 AS yes FROM chat_bans WHERE sender = $1`, [from.id]);
+    if (banned) return fail(403, 'banned', 'Du kannst hier gerade nicht schreiben.');
     await limit(`chat:from:${from.id}`, 10, MINUTE, SLOW_DOWN);
     await limit(`chat:ip:${ip}`, 30, MINUTE, SLOW_DOWN);
     await limit(`chat:ip-hour:${ip}`, 300, 60 * MINUTE, SLOW_DOWN);

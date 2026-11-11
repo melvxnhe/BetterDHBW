@@ -7,8 +7,9 @@
 // - /api/courses, /api/rapla/lectures/<id>/events, /api/mensa: passed through
 //   to api.dhbw.app, which does not allow browsers to call it directly (the
 //   same code as the Vercel functions, api/_dhbw.js).
-// - /api/account/<action> and /api/chat/<action>: the accounts and the chat
-//   (api/_account.js, api/_chat.js), against DATABASE_URL from .env, or else
+// - /api/account/<action>, /api/chat/<action>, /api/admin/<action> and /admin:
+//   the accounts, the chat and the admin area (api/_account.js, api/_chat.js,
+//   api/_admin.js), against DATABASE_URL from .env, or else
 //   a local Postgres (PGlite) in .data/. E-mails are not sent locally: their
 //   links appear in this console.
 // - /dev.html, the page with test data, is served from the project folder.
@@ -23,7 +24,8 @@ import { answer, HEADERS } from './api/_dhbw.js';
 import { useDatabase } from './api/_db.js';
 import { handleAccount } from './api/_account.js';
 import { handleChat } from './api/_chat.js';
-import { MAX_BODY, JSON_HEADERS, TOO_LARGE, BAD_REQUEST } from './api/_http.js';
+import { handleAdmin } from './api/_admin.js';
+import { MAX_BODY, JSON_HEADERS, TOO_LARGE, BAD_REQUEST, bodyOf } from './api/_http.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const root = join(here, 'public') + sep;
@@ -62,7 +64,7 @@ async function proxy(path, res) {
 
 // ---------- /api/account/<action>, /api/chat/<action> ----------
 
-const APIS = { account: handleAccount, chat: handleChat };
+const APIS = { account: handleAccount, chat: handleChat, admin: handleAdmin };
 
 // Reads at most MAX_BODY; anything beyond is read and dropped (up to 1 MB,
 // then the connection goes), so the client still gets its 413.
@@ -81,7 +83,7 @@ function readBody(req) {
 }
 
 async function json(handle, action, req, url, res) {
-  const send = (out) => res.writeHead(out.status, { ...JSON_HEADERS, ...out.headers, ...(out.cookies.length ? { 'Set-Cookie': out.cookies } : {}) }).end(JSON.stringify(out.body));
+  const send = (out) => res.writeHead(out.status, { ...JSON_HEADERS, ...out.headers, ...(out.cookies.length ? { 'Set-Cookie': out.cookies } : {}) }).end(bodyOf(out));
   if (Number(req.headers['content-length'] || 0) > MAX_BODY) {
     res.setHeader('Connection', 'close');
     return send(TOO_LARGE);
@@ -125,7 +127,8 @@ const server = createServer(async (req, res) => {
     for (const [k, v] of Object.entries(headersFor(url.pathname))) res.setHeader(k, v);
 
     const name = path.startsWith('/api/') ? path.split('/')[2] : ''; // "/api/chat/send" → "chat"
-    if (Object.hasOwn(APIS, name)) await json(APIS[name], path.slice(`/api/${name}/`.length), req, url, res);
+    if (path === '/admin') await json(handleAdmin, 'page', req, url, res); // as vercel.json rewrites it
+    else if (Object.hasOwn(APIS, name)) await json(APIS[name], path.slice(`/api/${name}/`.length), req, url, res);
     else if (path.startsWith('/api/')) await proxy(path.slice('/api'.length), res);
     else await file(path, req, res);
   } catch (err) {

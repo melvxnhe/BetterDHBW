@@ -5,7 +5,9 @@
   "outputDirectory": "public",
   "rewrites": [
     { "source": "/api/account/:action", "destination": "/api/account?action=:action" },
-    { "source": "/api/chat/:action", "destination": "/api/chat?action=:action" }
+    { "source": "/api/chat/:action", "destination": "/api/chat?action=:action" },
+    { "source": "/api/admin/:action", "destination": "/api/admin?action=:action" },
+    { "source": "/admin", "destination": "/api/admin?action=page" }
   ],
   "headers": [
     {

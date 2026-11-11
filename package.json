@@ -10,6 +10,7 @@
     "serve": "node serve.mjs",
     "start": "node build.mjs && node serve.mjs",
     "db:migrate": "node scripts/migrate.mjs",
+    "admin:hash": "node scripts/admin-hash.mjs",
     "test": "node --test tests/"
   },
   "engines": {

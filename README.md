@@ -65,7 +65,7 @@ Anmelden ist freiwillig; der Stundenplan geht ohne. Mit Konto sind Kurs und zule
 - Server: `api/account.js` → `api/_account.js` (alle Regeln), mit `api/_password.js` (Passwörter), `api/_mail.js` (E-Mails) und der Datenbank `api/_db.js` (Neon Postgres; Tabellen legt sie beim ersten Aufruf selbst an, oder `npm run db:migrate`).
 - Seite: `src/account.js` (Anmelden, Registrieren, Konto, Notizen), Adressen `?konto=anmelden`, `?konto=registrieren`, `?konto=konto`.
 - Lokal (`npm start`) ohne `DATABASE_URL`: eine Postgres-Datenbank in `.data/` (PGlite), E-Mails erscheinen in der Konsole.
-- `npm test`: 29 Angriffstests gegen frische Server (fremde Domains, schwache Passwörter, CSRF, SQL-Injection, fremde Notizen, Sperren, Chat-Fluten, …).
+- `npm test`: 42 Angriffstests gegen frische Server (fremde Domains, schwache Passwörter, CSRF, SQL-Injection, fremde Notizen, Sperren, Chat-Fluten, Adminbereich ohne Anmeldung, …).
 
 ## Chat
 
@@ -75,8 +75,21 @@ Unten rechts auf jeder Seite: ein Chat für alle und einer pro Kurs (der offene 
 - Solange `CHAT_GUESTS` nicht `off` ist, schreiben auch Besucher ohne Konto, als „Gast 1234“. Die Nummer hängt an einem Cookie. Namen, die mit „Gast“ oder „Nutzer“ anfangen, kann niemand wählen. Zum Testen ist das an; für den echten Betrieb `CHAT_GUESTS=off` setzen, dann schreibt nur, wer angemeldet ist.
 - Nachrichten sind reiner Text (höchstens 500 Zeichen) und werden als Text angezeigt, nie als HTML. Limits: 10 Nachrichten pro Minute und Person, 30 pro Minute und IP.
 - Neue Nachrichten holt die Seite alle paar Sekunden ab, solange der Chat offen ist (Vercel-Funktionen können nichts von sich aus schicken). Ist er zu, zeigt ein Punkt am Knopf, dass etwas Neues da ist.
-- Nachrichten werden nach 30 Tagen gelöscht, die eines Kontos mit dem Konto. Eine Moderation (melden, löschen) gibt es noch nicht.
+- Nachrichten werden nach 30 Tagen gelöscht, die eines Kontos mit dem Konto. Löschen und Sperren geht im Adminbereich (siehe unten); melden können Nutzer noch nichts.
 - Server: `api/chat.js` → `api/_chat.js`. Seite: `src/chat.js`. Tests: `tests/chat.test.mjs`.
+
+## Adminbereich
+
+Unter `/admin`, für den Betreiber: Zahlen auf einen Blick, Chat-Nachrichten löschen (einzeln oder alles von einem Absender), Absender sperren, Konten suchen, Anzeigenamen entfernen, Konten löschen.
+
+- Es gibt ihn nur, wo `ADMIN_PASSWORD_HASH` gesetzt ist. Ohne die Variable antwortet `/admin` mit 404. Auf der Seite führt kein Link dorthin, und Suchmaschinen sollen ihn nicht aufnehmen (`noindex`).
+- Das Passwort steht nirgends: nicht im Code, nicht auf GitHub, nicht bei Vercel. Gespeichert ist nur sein scrypt-Hash. `npm run admin:hash` fragt das Passwort ab und gibt den Hash aus; `npm run admin:hash -- --env` schreibt ihn in `.env` (wird nicht eingecheckt).
+- Auf Vercel: **Settings → Environment Variables** → `ADMIN_PASSWORD_HASH` mit dem Wert hinter dem `=`, als „Sensitive“ markieren, neu deployen. Neues Passwort: neuen Hash erzeugen, Variable ersetzen, neu deployen.
+- Anmelden: höchstens 8 Versuche in 15 Minuten pro IP, 40 pro Stunde insgesamt. Die Sitzung ist ein eigenes Cookie (HttpOnly, Secure, SameSite=Strict) und gilt 12 Stunden.
+- Wer nicht angemeldet ist, bekommt nur das Anmeldeformular. Aufbau und Skript des Panels schickt der Server erst nach der Anmeldung. Der Code dazu liegt allerdings in diesem Repository: Ist es öffentlich, kann ihn jeder lesen (das Passwort nicht).
+- Jede Änderung braucht eine Anfrage von der eigenen Seite (CSRF) und steht im Server-Log (Aktion und Kennung, keine Inhalte).
+- Eine Sperre hält bei Konten. Ein Gast ist nur ein Cookie und bekommt eine neue Nummer, wenn er es löscht; dagegen helfen die Limits pro IP und `CHAT_GUESTS=off`.
+- Server: `api/admin.js` → `api/_admin.js`, die Seiten in `api/_admin_page.js`. Tests: `tests/admin.test.mjs`.
 
 ### Einrichten auf Vercel
 
@@ -117,6 +130,7 @@ Der Server (`api/`, als Vercel-Funktionen; Dateien mit `_` sind geteilter Code, 
 - `_dhbw.js`: die Weiterleitung zu api.dhbw.app; `courses.js`, `mensa.js`, `rapla/lectures/[id]/events.js` sind ihre drei Adressen.
 - `account.js` → `_account.js`: die Konten (Registrieren, Anmelden, Einstellungen, Notizen, Anzeigename).
 - `chat.js` → `_chat.js`: der Chat.
+- `admin.js` → `_admin.js`: der Adminbereich; `_admin_page.js`: seine zwei Seiten (Anmelden, Panel).
 - `_session.js`: wer fragt (Sitzung oder Gast). `_limits.js`: Limits gegen Fluten und Raten. `_password.js`: Passwörter hashen und prüfen. `_mail.js`: die E-Mails und ihr Versand. `_db.js`: Datenbank und Tabellen.
 - `_http.js`: Antworten, CSRF-Prüfung und Grenzen für beide Server. `_vercel.js`: macht aus Konten und Chat je eine Vercel-Funktion.
 

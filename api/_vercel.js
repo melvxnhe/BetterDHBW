@@ -1,15 +1,15 @@
-// Turns one of the JSON APIs (_account.js, _chat.js) into a Vercel function:
+// Turns one of the JSON APIs (_account.js, _chat.js, _admin.js) into a Vercel function:
 // reads the request the way Vercel hands it over, sends the answer back.
 // /api/<name>/<action> arrives rewritten as /api/<name>?action=<action>
 // (vercel.json).
 
-import { MAX_BODY, JSON_HEADERS, TOO_LARGE, BAD_REQUEST } from './_http.js';
+import { MAX_BODY, JSON_HEADERS, TOO_LARGE, BAD_REQUEST, bodyOf } from './_http.js';
 
 export const vercel = (handle) => async function handler(req, res) {
   const send = (out) => {
     for (const [k, v] of Object.entries({ ...JSON_HEADERS, ...out.headers })) res.setHeader(k, v);
     if (out.cookies.length) res.setHeader('Set-Cookie', out.cookies);
-    res.status(out.status).send(JSON.stringify(out.body));
+    res.status(out.status).send(bodyOf(out));
   };
 
   let body = null;

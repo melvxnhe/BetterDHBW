@@ -6,6 +6,8 @@
 // - Guests (the chat, while it is open to people without an account) get a
 //   random id in a cookie of the same kind. Nothing about them is stored
 //   except what they write.
+// - The admin area has sessions of its own: another cookie (SameSite=Strict,
+//   so no link from elsewhere arrives signed in), another table, 12 hours.
 
 import { createHash, randomBytes } from 'node:crypto';
 import { q } from './_db.js';
@@ -13,7 +15,9 @@ import { Problem } from './_http.js';
 
 const SESSION = '__Host-sid';
 const GUEST = '__Host-gid';
+const ADMIN = '__Host-aid';
 const SESSION_DAYS = 30;
+const ADMIN_HOURS = 12;
 const GUEST_DAYS = 365;
 const MAX_TOKEN = 100; // anything longer is not one of ours
 const DAY = 86400;
@@ -24,7 +28,7 @@ export const newToken = () => randomBytes(32).toString('base64url');
 // A number from 1000 to 9999 that is always the same for the same id: "Gast 4821".
 export const numberOf = (id) => 1000 + (parseInt(createHash('sha256').update(String(id)).digest('hex').slice(0, 8), 16) % 9000);
 
-const cookie = (name, value, maxAge) => `${name}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+const cookie = (name, value, maxAge, sameSite = 'Lax') => `${name}=${value}; Path=/; HttpOnly; Secure; SameSite=${sameSite}; Max-Age=${maxAge}`;
 export const clearSession = () => cookie(SESSION, '', 0);
 
 // The token a request carries in the cookie `name` and its hash, or null.
@@ -83,4 +87,27 @@ export const guestOf = (headers) => tokenOf(headers, GUEST);
 export function newGuest() {
   const token = newToken();
   return { hash: sha256(token), cookie: cookie(GUEST, token, GUEST_DAYS * DAY) };
+}
+
+// ---------- the admin ----------
+
+// Returns the Set-Cookie value that signs the browser in as admin.
+export async function startAdmin() {
+  const token = newToken();
+  await q(`INSERT INTO admin_sessions (token_hash, expires_at) VALUES ($1, now() + make_interval(hours => $2))`, [sha256(token), ADMIN_HOURS]);
+  return cookie(ADMIN, token, ADMIN_HOURS * 3600, 'Strict');
+}
+
+export async function isAdmin(headers) {
+  const session = tokenOf(headers, ADMIN);
+  if (!session) return false;
+  const [row] = await q(`SELECT 1 AS ok FROM admin_sessions WHERE token_hash = $1 AND expires_at > now()`, [session.hash]);
+  return !!row;
+}
+
+// Ends the admin session a request carries; returns the Set-Cookie value that clears it.
+export async function endAdmin(headers) {
+  const session = tokenOf(headers, ADMIN);
+  if (session) await q(`DELETE FROM admin_sessions WHERE token_hash = $1`, [session.hash]);
+  return cookie(ADMIN, '', 0, 'Strict');
 }

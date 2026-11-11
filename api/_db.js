@@ -99,8 +99,20 @@ export const SCHEMA = [
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS chat_room ON chat_messages (room, id)`,
+  // the admin area (/admin): its sessions, kept apart from those of the users
+  `CREATE TABLE IF NOT EXISTS admin_sessions (
+    token_hash text PRIMARY KEY,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz NOT NULL
+  )`,
+  // senders an admin has stopped from writing in the chat (sender as in chat_messages)
+  `CREATE TABLE IF NOT EXISTS chat_bans (
+    sender text PRIMARY KEY,
+    name text NOT NULL DEFAULT '',
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
 ];
-const LAST = 'chat_room';
+const LAST = 'chat_bans';
 
 // A cold start checks for the last entry of the schema (one round trip) and
 // only runs the statements when it's missing: on a new database, and once

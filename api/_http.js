@@ -10,10 +10,12 @@ export const JSON_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
 };
 
-// An answer: the status, a JSON body, the Set-Cookie values that go with it,
-// and headers that differ from JSON_HEADERS (a cache lifetime, say).
+// An answer: the status, a body (sent as JSON; a string is sent as it is, for
+// a page), the Set-Cookie values that go with it, and headers that differ
+// from JSON_HEADERS (a cache lifetime, another content type).
 export const reply = (status, body, cookies = [], headers = {}) => ({ status, body, cookies, headers });
 export const fail = (status, error, message, extra = {}) => reply(status, { error, message, ...extra });
+export const bodyOf = (out) => (typeof out.body === 'string' ? out.body : JSON.stringify(out.body));
 
 export const TOO_LARGE = fail(413, 'too-large', 'Anfrage zu groß.');
 export const BAD_REQUEST = fail(400, 'bad-request', 'Ungültige Anfrage.');
