@@ -13,6 +13,7 @@ function setupTimetable() {
   const fWeekday = new Intl.DateTimeFormat('de-DE', { timeZone: TZ, weekday: 'long' });
   const fDayLong = new Intl.DateTimeFormat('de-DE', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long' });
   const fKey = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const fHour = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
   const dayKey = (t) => fKey.format(t);
   const daysBetween = (a, b) => Math.round((Date.parse(dayKey(b)) - Date.parse(dayKey(a))) / 864e5);
   const fromTo = (a, b) => spanText(a, b); // render.js: "08:45 – 13:15", "ganztägig", …
@@ -193,10 +194,22 @@ function setupTimetable() {
       return { running, next };
     }
 
-    // today's column, and which week tabs hold today or lie behind
+    // today's column with the now-line at the current hour, and which week
+    // tabs hold today or lie behind
     function updateCalendar(t) {
       const ms = +t, today = dayKey(t);
-      days.forEach((d) => d.classList.toggle('is-today', d.dataset.date === today));
+      const [h, m] = fHour.format(t).split(':').map(Number); // Berlin wall clock, as the grid's hours are
+      const hour = h + m / 60;
+      days.forEach((d) => {
+        const isToday = d.dataset.date === today;
+        d.classList.toggle('is-today', isToday);
+        // the now-line, only within the hours the week's grid shows (--lo/--hi on the week)
+        const week = d.closest('.week');
+        const lo = +week?.style.getPropertyValue('--lo'), hi = +week?.style.getPropertyValue('--hi');
+        const inGrid = isToday && !!week && hour >= lo && hour <= hi;
+        d.classList.toggle('has-now', inGrid);
+        if (inGrid) d.style.setProperty('--now', hour.toFixed(3)); else d.style.removeProperty('--now');
+      });
       tabs.forEach((tab, j) => {
         const [a, b] = span(panels[j]);
         tab.classList.toggle('has-today', a <= ms && ms < b);

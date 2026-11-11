@@ -136,16 +136,14 @@ button, .button, .chip, [role="tab"] {
 
 .num { font-variant-numeric: tabular-nums; }
 
-/* ---------- header: a translucent material, divider only once content scrolls under it ---------- */
+/* ---------- header: on the page ground, a rule only once content scrolls under it ---------- */
 
 .bar {
   position: sticky;
   top: 0;
   z-index: 10;
   padding-top: env(safe-area-inset-top, 0px);
-  background: color-mix(in srgb, var(--bg) 72%, transparent);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  background: var(--bg);
 }
 
 .bar::after {
@@ -329,10 +327,6 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 .brand strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 650; letter-spacing: -0.01em; }
 .brand span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 
-@media (prefers-reduced-transparency: reduce) {
-  .bar { background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
-}
-
 /* ---------- buttons: press feedback on :active, hover gated ---------- */
 
 .button {
@@ -376,24 +370,24 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
     align-items: end;
     gap: 40px;
-    padding-block: 56px 48px;
+    padding-block: 32px 28px;
   }
 }
 
 .title {
-  font-size: clamp(2.75rem, 7vw, 5rem);
+  font-size: clamp(2.25rem, 4.2vw, 3.5rem);
   line-height: 1;
   font-weight: 700;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.03em;
   /* the longest codes ("WOW23B---VERSORGUNGSWIRTSCHAFT") are wider than a phone */
   overflow-wrap: anywhere;
 }
 
 /* "Wirtschaftsinformatik – Software Engineering 26": what the code stands for */
 .title-full {
-  margin-top: 10px;
+  margin-top: 8px;
   max-width: 32ch;
-  font-size: clamp(1.125rem, 2.2vw, 1.375rem);
+  font-size: clamp(1rem, 1.6vw, 1.25rem);
   line-height: 1.25;
   font-weight: 600;
   letter-spacing: -0.015em;
@@ -402,11 +396,11 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 }
 
 .subtitle {
-  margin-top: 12px;
-  max-width: 34ch;
+  margin-top: 10px;
+  max-width: 40ch;
   color: var(--muted);
-  font-size: 1.0625rem;
-  line-height: 1.45;
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 .subtitle b { color: var(--text); font-weight: 600; }
@@ -455,7 +449,7 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 
 .now-rel {
   margin-top: 14px;
-  font-size: 1.0625rem;
+  font-size: 1rem;
   font-weight: 600;
 }
 
@@ -625,7 +619,7 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 
 /* ---------- week panels ---------- */
 
-.weeks { padding-block: 20px 8px; }
+.weeks { padding-block: 16px 8px; }
 
 .week + .week { margin-top: 56px; }
 .js .week + .week { margin-top: 0; }
@@ -654,8 +648,125 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
   gap: 10px;
 }
 
+/* the hour axis only exists in the grid */
+.hours { display: none; }
+
+/* All-day entries: a row above the days, one cell per day. In the list
+   (phones, tablets) each entry names its day; in the grid the cells sit over
+   their columns and the name is dropped. */
+.allday {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.allday-day { display: grid; gap: 6px; }
+.allday-day:empty, .allday-day:not(:has(.session)) { display: none; }
+.allday-name { font-size: 0.875rem; font-weight: 650; }
+
 @media (min-width: 1000px) {
-  .days { grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr)); gap: 12px; }
+  .days {
+    --hour: 56px;
+    grid-template-columns: 40px repeat(var(--cols, 5), minmax(0, 1fr));
+    gap: 0 10px;
+  }
+
+  .allday {
+    grid-template-columns: 40px repeat(var(--cols, 5), minmax(0, 1fr));
+    gap: 0 10px;
+    margin-bottom: 8px;
+  }
+
+  .allday-day { grid-column: auto; }
+  .allday-day:first-child { grid-column: 2; }
+  .allday-day:not(:has(.session)) { display: block; }
+  .allday-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .allday .session { padding: 6px 10px 7px 12px; }
+  .allday .session-time { display: none; }
+
+  /* the hours, one label per line, right against the first column */
+  .hours {
+    display: block;
+    position: relative;
+    height: calc((var(--hi) - var(--lo)) * var(--hour));
+    margin-top: 32px; /* the day head above the columns */
+  }
+
+  .hours span {
+    position: absolute;
+    top: calc((var(--h) - var(--lo)) * var(--hour));
+    right: 8px;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .days .day-head { height: 28px; margin-bottom: 4px; }
+
+  /* the column: one line per hour (taste-skill-ignore: a calendar's hour rules, not a gradient) */
+  .days .day-items {
+    position: relative;
+    display: block;
+    height: calc((var(--hi) - var(--lo)) * var(--hour));
+    border-radius: 12px;
+    background-color: color-mix(in srgb, var(--surface) 45%, transparent);
+    background-image: repeating-linear-gradient(to bottom, var(--hairline) 0 1px, transparent 1px var(--hour)); /* taste-skill-ignore */
+  }
+
+  .days .day-empty { display: none; }
+
+  /* the now-line: through today's column at the current time, in the accent
+     (.has-now: timetable.js sets it only while the time is within the grid's hours) */
+  .days .day.has-now .day-items::after {
+    content: "";
+    position: absolute;
+    z-index: 2;
+    left: -4px;
+    right: 0;
+    top: calc((var(--now) - var(--lo)) * var(--hour));
+    height: 2px;
+    border-radius: 1px;
+    background: var(--accent);
+    box-shadow: -2px 0 0 0 var(--accent); /* taste-skill-ignore: the line's own left cap */
+    pointer-events: none;
+  }
+
+  .days .day.is-today .day-items { background-color: color-mix(in srgb, var(--surface) 70%, transparent); }
+
+  /* a block sits at its hours; overlapping entries share the width in lanes */
+  .days .day-items .session {
+    position: absolute;
+    top: calc((var(--s) - var(--lo)) * var(--hour) + 1px);
+    left: calc(var(--lane, 0) / var(--lanes, 1) * 100%);
+    width: calc(100% / var(--lanes, 1) - 2px);
+    height: calc((var(--e) - var(--s)) * var(--hour) - 3px);
+    min-height: 18px;
+    padding: 7px 10px 7px 9px;
+    gap: 2px;
+    align-content: start;
+    overflow: hidden;
+    container-type: size;
+  }
+
+  .days .day-items .session-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; hyphens: auto; }
+  .days .day-items .session .progress { position: absolute; inset: auto 10px 7px 12px; margin: 0; }
+  .days .day-items .session-note { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
+
+  /* what still fits as a block gets shorter: the title first, then only the time */
+  @container (max-height: 110px) {
+    .session-meta, .session-note, .session .progress { display: none !important; }
+    .session-title { -webkit-line-clamp: 2; }
+  }
+  @container (max-height: 74px) {
+    .session-status, .session-tag, .note-button { display: none !important; }
+    .session-title { -webkit-line-clamp: 1; }
+  }
+  @container (max-height: 42px) {
+    .session { padding-block: 2px; }
+    .session-time { display: none; }
+    .session-title { font-size: 0.75rem; line-height: 1.2; }
+  }
 }
 
 .day {
@@ -674,6 +785,7 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 }
 
 .day-items { display: grid; gap: 8px; min-width: 0; }
+.day-items .session { min-width: 0; }
 
 .day-head {
   display: flex;
@@ -719,10 +831,10 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
   display: grid;
   gap: 3px;
   min-width: 0;
-  padding: 12px 14px 13px 16px;
+  padding: 12px 14px 13px 13px;
+  border-left: 3px solid var(--c, var(--m-misc));
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: inset 3px 0 0 var(--c, var(--m-misc));
   transition: opacity 150ms ease;
 }
 
@@ -778,7 +890,7 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 
 .session .progress { display: none; margin-top: 8px; }
 
-.session.is-live { box-shadow: inset 3px 0 0 var(--c, var(--m-misc)), 0 0 0 2px var(--accent); }
+.session.is-live { outline: 2px solid var(--accent); outline-offset: 0; }
 .session.is-live .session-status,
 .session.is-live .progress,
 .session.is-next .session-status { display: block; }
@@ -837,6 +949,7 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 .mensa-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  align-items: start; /* the shorter column keeps its own height */
   gap: 12px;
 }
 
@@ -852,24 +965,24 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
 
 .mensa-col-title { margin-bottom: 4px; font-size: 0.875rem; font-weight: 600; color: var(--muted); }
 
-.dishes { display: grid; margin: 0; padding: 0; list-style: none; }
+.dishes { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 
 .dish {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: baseline;
   gap: 16px;
-  padding-block: 11px;
-  border-top: 1px solid var(--surface-2);
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent); /* a tone step per dish instead of a line between them */
 }
 
-.dish:first-child { border-top: 0; }
 .dish-name { font-size: 0.9375rem; line-height: 1.4; overflow-wrap: break-word; }
 .dish-name b { font-weight: 600; }
 .dish-name span { color: var(--muted); }
 .dish-price { font-size: 0.9375rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-.mensa-desserts { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--surface-2); color: var(--muted); font-size: 0.875rem; line-height: 1.45; }
+.mensa-desserts { margin-top: 12px; padding: 0 12px; color: var(--muted); font-size: 0.875rem; line-height: 1.45; }
 .mensa-desserts b { margin-right: 6px; color: var(--text); font-weight: 600; }
 .mensa-none { padding-block: 11px; color: var(--muted); font-size: 0.9375rem; }
 .mensa-note { margin-bottom: 12px; color: var(--muted); font-size: 0.875rem; }
@@ -978,7 +1091,6 @@ body[data-view="home"] .bar.show-search .search { opacity: 1; pointer-events: au
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
-  min-height: min(calc(100svh - 72px), 880px);
   padding-top: 8px;
 }
 
@@ -1153,7 +1265,7 @@ body[data-view="home"] .bar.show-search .search { opacity: 1; pointer-events: au
   gap: 12px 48px;
 }
 
-.section-lead { max-width: 46ch; font-size: 1.0625rem; line-height: 1.5; }
+.section-lead { max-width: 46ch; font-size: 1rem; line-height: 1.5; }
 
 @media (max-width: 799px) {
   .section-head, .how-head { grid-template-columns: minmax(0, 1fr); }
@@ -1222,7 +1334,7 @@ body[data-view="home"] .bar.show-search .search { opacity: 1; pointer-events: au
   align-items: baseline;
   gap: 12px;
   margin-bottom: 6px;
-  font-size: 1.1875rem;
+  font-size: 1.125rem;
 }
 
 .program-head b { font-weight: 700; letter-spacing: -0.01em; }
@@ -1367,7 +1479,7 @@ body[data-view="home"] .foot {
 }
 
 .account-title { font-size: clamp(2rem, 5vw, 2.75rem); line-height: 1.05; font-weight: 700; letter-spacing: -0.03em; }
-.account-lead { margin-top: 10px; color: var(--muted); font-size: 1.0625rem; line-height: 1.45; overflow-wrap: anywhere; }
+.account-lead { margin-top: 10px; color: var(--muted); font-size: 1rem; line-height: 1.45; overflow-wrap: anywhere; }
 .account-lead a, .account-links a, .note-list a { color: var(--text); text-underline-offset: 3px; }
 
 .account-form { display: grid; gap: 16px; margin-top: 24px; }
@@ -1437,7 +1549,7 @@ body[data-view="home"] .foot {
 }
 
 .account-section { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--hairline); }
-.account-section h2 { margin-bottom: 8px; font-size: 1.1875rem; font-weight: 650; letter-spacing: -0.01em; }
+.account-section h2 { margin-bottom: 8px; font-size: 1.125rem; font-weight: 650; letter-spacing: -0.01em; }
 .account-section > p { color: var(--muted); line-height: 1.5; }
 .account-section > p b { color: var(--text); font-weight: 600; }
 .account-card > [data-flash] { margin-top: 20px; }
@@ -1608,7 +1720,7 @@ body.has-chat .foot { padding-bottom: 96px; }
   padding: 12px 12px 6px 18px;
 }
 
-.chat-title { font-size: 1.0625rem; font-weight: 650; letter-spacing: -0.01em; }
+.chat-title { font-size: 1rem; font-weight: 650; letter-spacing: -0.01em; }
 
 .chat-close {
   display: grid;
@@ -1839,7 +1951,7 @@ body.has-chat .foot { padding-bottom: 96px; }
 
 .settings.is-instant, .settings.is-instant:popover-open { transition: none; }
 
-.settings-title { margin-bottom: 14px; font-size: 1.0625rem; font-weight: 650; letter-spacing: -0.01em; }
+.settings-title { margin-bottom: 14px; font-size: 1rem; font-weight: 650; letter-spacing: -0.01em; }
 .settings-group { min-width: 0; margin: 0; padding: 0; border: 0; }
 .settings-group + .settings-group { margin-top: 18px; }
 .settings-label { margin-bottom: 8px; padding: 0; color: var(--muted); font-size: 0.8125rem; font-weight: 600; }
@@ -1914,7 +2026,7 @@ body[data-view="match"] .bar [data-ics] { display: none; }
   margin-bottom: 24px;
 }
 
-.match-field { display: grid; gap: 6px; }
+.match-field { display: grid; gap: 6px; grid-area: auto; }
 .match-label { font-size: 0.875rem; font-weight: 600; }
 .match-field .search-field { height: 46px; background: var(--surface); }
 .match-field .search-list { inset: calc(100% + 6px) 0 auto 0; }

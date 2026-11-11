@@ -39,12 +39,14 @@ export async function checkLogin(password, stored) {
 
 // Is the password in a known data breach? Have I Been Pwned's range API only
 // ever sees the first 5 characters of the SHA-1. If it can't be reached, the
-// check is skipped rather than blocking sign-ups.
+// check is skipped rather than blocking sign-ups. Five seconds: with 2.5 s the
+// check timed out whenever the machine was busy (the test suite starts three
+// servers at once), and a sign-up that skips it is weaker than one that waits.
 async function breached(password) {
   try {
     const sha1 = createHash('sha1').update(password).digest('hex').toUpperCase();
     const res = await fetch(`https://api.pwnedpasswords.com/range/${sha1.slice(0, 5)}`, {
-      headers: { 'Add-Padding': 'true', 'User-Agent': 'dhbw-mannheim-stundenplan' }, signal: AbortSignal.timeout(2500),
+      headers: { 'Add-Padding': 'true', 'User-Agent': 'dhbw-mannheim-stundenplan' }, signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return false;
     const suffix = sha1.slice(5);

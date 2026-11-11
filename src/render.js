@@ -120,8 +120,39 @@ export function splitBlock(events, now = Date.now()) {
   return { block: blocks[i], earlier: blocks.slice(0, i).flat(), later: blocks.slice(i + 1).flat() };
 }
 
+// Rapla stores an all-day entry as 00:00 to 00:00 the next day (or later).
+const isAllDay = (e) => e.end - e.start >= 20 * 36e5 && hm(partsOf(e.start)) === '00:00' && hm(partsOf(e.end)) === '00:00';
+
+// Where a day's events sit in the time grid: for each one its hours of the
+// day as [s, e] (0 to 24, clamped to this day, so an entry over several days
+// fills its first day to midnight) and, where entries overlap, a lane so
+// they sit side by side. All-day entries are left out: they get a row of
+// their own above the grid. Returns a Map event → { s, e, lane, lanes }
+// instead of writing on the events, which app.js compares as JSON.
+const HOUR_OF = (t, from, to) => (t <= from ? 0 : t >= to ? 24 : ((p) => p.hour + p.minute / 60)(partsOf(t)));
+
+function layoutDay(events, from, to) {
+  const layout = new Map();
+  const ends = []; // when each lane is free again
+  let cluster = [], clusterEnd = -Infinity;
+  const close = () => { cluster.forEach((e) => { layout.get(e).lanes = ends.length; }); cluster = []; ends.length = 0; clusterEnd = -Infinity; };
+  for (const e of events) {
+    if (isAllDay(e)) continue;
+    if (cluster.length && e.start >= clusterEnd) close();
+    let lane = ends.findIndex((end) => end <= e.start);
+    if (lane < 0) { lane = ends.length; ends.push(e.end); } else ends[lane] = e.end;
+    layout.set(e, { s: HOUR_OF(e.start, from, to), e: Math.max(HOUR_OF(e.end, from, to), HOUR_OF(e.start, from, to) + 0.25), lane, lanes: 1 });
+    cluster.push(e);
+    clusterEnd = Math.max(clusterEnd, e.end);
+  }
+  close();
+  return layout;
+}
+
 // Every week from the first to the last entry, gaps included, so a week
-// without lectures shows up as one instead of vanishing.
+// without lectures shows up as one instead of vanishing. Each day carries
+// its layout (see layoutDay) and each week the hours its grid shows: 8 to 18,
+// stretched when something starts earlier or ends later.
 export function toWeeks(block) {
   if (!block.length) return [];
   const byDay = new Map();
@@ -134,12 +165,17 @@ export function toWeeks(block) {
       const p = dayOf(addDays(monday, i));
       const key = keyOf(p);
       const list = byDay.get(key) || [];
-      if (i < 5 || list.length) days.push({ ...p, key, weekday: WEEKDAYS[i], events: list }); // a weekend day only when something is on
+      if (i >= 5 && !list.length) continue; // a weekend day only when something is on
+      const n = dayOf(addDays(monday, i + 1));
+      const from = berlin(p.year, p.month, p.day), to = berlin(n.year, n.month, n.day);
+      days.push({ ...p, key, weekday: WEEKDAYS[i], events: list, layout: layoutDay(list, from, to) });
     }
+    let lo = 8, hi = 18;
+    for (const d of days) for (const { s, e } of d.layout.values()) { lo = Math.min(lo, Math.floor(s)); hi = Math.max(hi, Math.ceil(e)); }
     const p0 = days[0], p4 = days[4], next = dayOf(addDays(monday, 7));
     const kw = isoWeek(p0);
     weeks.push({
-      id: `kw${kw}-${p0.year}`, kw, days,
+      id: `kw${kw}-${p0.year}`, kw, days, lo, hi,
       start: berlin(p0.year, p0.month, p0.day),
       end: berlin(next.year, next.month, next.day),
       events: days.flatMap((x) => x.events),
@@ -152,11 +188,14 @@ export function toWeeks(block) {
 
 // ---------- markup ----------
 
-// `heading`: h4 inside a week; the homepage preview has no headings above it and passes p
-function sessionHTML(e, heading = 'h4') {
+// `heading`: h4 inside a week; the homepage preview has no headings above it
+// and passes p. `place` is the entry's place in the week's time grid (layoutDay);
+// on wide screens styles.css positions the block by it, elsewhere it is a list item.
+function sessionHTML(e, heading = 'h4', place = null) {
   const [from, to] = spanParts(e.start, e.end);
   const meta = [e.room, hours(e.hours)].filter(Boolean).join(' · ');
-  return `<article class="session" data-id="${esc(String(e.id ?? ''))}" data-module="${e.module}" data-start="${e.start}" data-end="${e.end}" data-room="${esc(e.room)}">
+  const style = place ? ` style="--s: ${+place.s.toFixed(3)}; --e: ${+place.e.toFixed(3)}; --lane: ${place.lane}; --lanes: ${place.lanes}"` : '';
+  return `<article class="session" data-id="${esc(String(e.id ?? ''))}" data-module="${e.module}" data-start="${e.start}" data-end="${e.end}" data-room="${esc(e.room)}" title="${esc(e.name)}"${style}>
 ${e.exam ? `<span class="session-tag">${esc(e.exam)}</span>` : ''}<p class="session-time"><time datetime="${new Date(e.start).toISOString()}">${from}</time>${to ? ` – <time datetime="${new Date(e.end).toISOString()}">${to}</time>` : ''}</p>
 <${heading} class="session-title">${title(e.name)}</${heading}>
 <p class="session-meta">${esc(meta)}</p>
@@ -171,13 +210,25 @@ function weekHTML(w) {
   const facts = [`KW ${w.kw}`, w.events.length ? plural(w.events.length, 'Termin', 'Termine') : 'keine Termine'];
   if (w.events.length) facts.push(hours(h));
   if (exams) facts.push(plural(exams, 'Prüfungstermin', 'Prüfungstermine'));
-  const days = w.days.map((d) => `<section class="day" data-date="${d.key}" aria-labelledby="d${d.key}">
+  const days = w.days.map((d) => {
+    const timed = d.events.filter((e) => d.layout.has(e));
+    return `<section class="day" data-date="${d.key}" aria-labelledby="d${d.key}">
 <h3 class="day-head" id="d${d.key}"><span class="day-name">${d.weekday}</span> <span class="day-date">${d.day}. ${MON_SHORT[d.month - 1]}</span> <span class="today-pill">Heute</span></h3>
-<div class="day-items">${d.events.length ? d.events.map((e) => sessionHTML(e)).join('\n') : '<p class="day-empty">Keine Termine</p>'}</div>
-</section>`).join('\n');
-  return `<section class="week" id="${w.id}" role="tabpanel" aria-labelledby="tab-${w.id}" data-start="${w.start}" data-end="${w.end}">
+<div class="day-items">${timed.length ? timed.map((e) => sessionHTML(e, 'h4', d.layout.get(e))).join('\n') : '<p class="day-empty">Keine Termine</p>'}</div>
+</section>`;
+  }).join('\n');
+  // all-day entries (an exam day, a project week) in a row of their own, one cell per day
+  const allDay = w.days.map((d) => d.events.filter((e) => !d.layout.has(e)));
+  const allDayRow = allDay.some((list) => list.length) ? `<div class="allday" style="--cols: ${w.days.length}">
+${w.days.map((d, i) => `<div class="allday-day"><p class="allday-name">${d.weekday}, ${d.day}. ${MON_SHORT[d.month - 1]}</p>${allDay[i].map((e) => sessionHTML(e)).join('\n')}</div>`).join('\n')}
+</div>` : '';
+  const ticks = [];
+  for (let h = w.lo; h <= w.hi; h++) ticks.push(`<span style="--h: ${h}">${h}</span>`);
+  return `<section class="week" id="${w.id}" role="tabpanel" aria-labelledby="tab-${w.id}" data-start="${w.start}" data-end="${w.end}" style="--lo: ${w.lo}; --hi: ${w.hi}">
 <header class="week-head"><h2 class="week-title">${w.title}</h2><p class="week-facts">${facts.join(' · ')}</p></header>
+${allDayRow}
 <div class="days" style="--cols: ${w.days.length}">
+<div class="hours" aria-hidden="true">${ticks.join('')}</div>
 ${days}
 </div>
 </section>`;

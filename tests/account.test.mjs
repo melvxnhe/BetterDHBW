@@ -7,6 +7,7 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { startServer, person as personAt } from './_server.mjs';
 
 const BASE = 'http://localhost:8139';
@@ -37,11 +38,18 @@ test('only DHBW Mannheim addresses can register', async () => {
   }
 });
 
-test('weak passwords are refused: too short, the address itself, breached', async () => {
+test('weak passwords are refused: too short, the address itself, breached', async (t) => {
   assert.equal((await alice.call('register', { email: EMAIL, password: 'kurz' })).status, 400);
   assert.equal((await alice.call('register', { email: EMAIL, password: EMAIL })).status, 400);
+  // The breach check asks Have I Been Pwned; when it is unreachable or slow,
+  // the server lets the sign-up through by design, so the check is only
+  // judged when the service answers within the server's own timeout.
+  // the same request the server will make (the range of this password), so a slow range is caught here, not there
+  const range = createHash('sha1').update('password1234').digest('hex').toUpperCase().slice(0, 5);
+  const reachable = await fetch(`https://api.pwnedpasswords.com/range/${range}`, { headers: { 'Add-Padding': 'true', 'User-Agent': 'dhbw-mannheim-stundenplan' }, signal: AbortSignal.timeout(4000) }).then((r) => r.ok, () => false);
+  if (!reachable) { t.diagnostic('Have I Been Pwned not answering within 4 s: the breached-password check was not judged'); return; }
   const breached = await alice.call('register', { email: EMAIL, password: 'password1234' });
-  assert.equal(breached.status, 400, 'password1234 is in every breach list (needs internet for the check)');
+  assert.equal(breached.status, 400, 'password1234 is in every breach list');
   assert.match(breached.data.message, /Datenlecks/);
 });
 

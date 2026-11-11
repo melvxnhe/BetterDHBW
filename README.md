@@ -41,6 +41,7 @@ Das Repo ist fertig für Vercel, `vercel.json` stellt alles ein:
 ## Kursplan
 
 - Die ganze laufende Theoriephase, auch die schon vergangenen Wochen (grau im Wochenwähler). Geöffnet wird die aktuelle Woche.
+- Ab 1000 px Breite ist die Woche ein Zeitraster: Stunden links, ein Tag pro Spalte, jede Vorlesung als Block an ihrer Uhrzeit; was sich überschneidet (zwei Gruppen), steht nebeneinander. Das Raster zeigt 8 bis 18 Uhr und dehnt sich, wenn etwas früher anfängt oder später endet. Durch den heutigen Tag läuft eine Linie in der Akzentfarbe an der aktuellen Uhrzeit. Ganztägige Einträge stehen in einer Zeile über dem Raster. Auf Handy und Tablet bleibt es die Liste pro Tag.
 - In der Praxisphase zeigt der Plan den nächsten Block, nach dem letzten Block den letzten. Ältere Blöcke stehen nur in der Kalenderdatei.
 - Unter dem Kürzel steht der volle Name, z. B. „Wirtschaftsinformatik – Software Engineering 26“. Studiengang aus api.dhbw.app, die Studienrichtung aus den Kürzeln der DHBW Mannheim (`TRACKS` in `src/catalog.js`); unbekannte Kürzel zeigen nur den Studiengang.
 
