@@ -65,7 +65,18 @@ Anmelden ist freiwillig; der Stundenplan geht ohne. Mit Konto sind Kurs und zule
 - Server: `api/account.js` → `api/_account.js` (alle Regeln), mit `api/_password.js` (Passwörter), `api/_mail.js` (E-Mails) und der Datenbank `api/_db.js` (Neon Postgres; Tabellen legt sie beim ersten Aufruf selbst an, oder `npm run db:migrate`).
 - Seite: `src/account.js` (Anmelden, Registrieren, Konto, Notizen), Adressen `?konto=anmelden`, `?konto=registrieren`, `?konto=konto`.
 - Lokal (`npm start`) ohne `DATABASE_URL`: eine Postgres-Datenbank in `.data/` (PGlite), E-Mails erscheinen in der Konsole.
-- `npm test`: 18 Angriffstests gegen einen frischen Server (fremde Domains, schwache Passwörter, CSRF, SQL-Injection, fremde Notizen, Sperren, …).
+- `npm test`: 29 Angriffstests gegen frische Server (fremde Domains, schwache Passwörter, CSRF, SQL-Injection, fremde Notizen, Sperren, Chat-Fluten, …).
+
+## Chat
+
+Unten rechts auf jeder Seite: ein Chat für alle und einer pro Kurs (der offene Kurs und die zuletzt geöffneten stehen zur Wahl).
+
+- Angemeldete schreiben unter ihrem Anzeigenamen (Kontoseite → „Name im Chat“; jeder Name nur einmal), ohne Namen als „Nutzer 1234“. Die E-Mail-Adresse sieht niemand.
+- Solange `CHAT_GUESTS` nicht `off` ist, schreiben auch Besucher ohne Konto, als „Gast 1234“. Die Nummer hängt an einem Cookie. Namen, die mit „Gast“ oder „Nutzer“ anfangen, kann niemand wählen. Zum Testen ist das an; für den echten Betrieb `CHAT_GUESTS=off` setzen, dann schreibt nur, wer angemeldet ist.
+- Nachrichten sind reiner Text (höchstens 500 Zeichen) und werden als Text angezeigt, nie als HTML. Limits: 10 Nachrichten pro Minute und Person, 30 pro Minute und IP.
+- Neue Nachrichten holt die Seite alle paar Sekunden ab, solange der Chat offen ist (Vercel-Funktionen können nichts von sich aus schicken). Ist er zu, zeigt ein Punkt am Knopf, dass etwas Neues da ist.
+- Nachrichten werden nach 30 Tagen gelöscht, die eines Kontos mit dem Konto. Eine Moderation (melden, löschen) gibt es noch nicht.
+- Server: `api/chat.js` → `api/_chat.js`. Seite: `src/chat.js`. Tests: `tests/chat.test.mjs`.
 
 ### Einrichten auf Vercel
 
@@ -104,15 +115,17 @@ Anmelden ist freiwillig; der Stundenplan geht ohne. Mit Konto sind Kurs und zule
 Der Server (`api/`, als Vercel-Funktionen; Dateien mit `_` sind geteilter Code, den auch `serve.mjs` nutzt):
 
 - `_dhbw.js`: die Weiterleitung zu api.dhbw.app; `courses.js`, `mensa.js`, `rapla/lectures/[id]/events.js` sind ihre drei Adressen.
-- `account.js` → `_account.js`: die Konten (Registrieren, Anmelden, Einstellungen, Notizen).
-- `_password.js`: Passwörter hashen und prüfen. `_mail.js`: die E-Mails und ihr Versand. `_db.js`: Datenbank und Tabellen. `_http.js`: Antworten und Grenzen, die beide Server gleich halten.
+- `account.js` → `_account.js`: die Konten (Registrieren, Anmelden, Einstellungen, Notizen, Anzeigename).
+- `chat.js` → `_chat.js`: der Chat.
+- `_session.js`: wer fragt (Sitzung oder Gast). `_limits.js`: Limits gegen Fluten und Raten. `_password.js`: Passwörter hashen und prüfen. `_mail.js`: die E-Mails und ihr Versand. `_db.js`: Datenbank und Tabellen.
+- `_http.js`: Antworten, CSRF-Prüfung und Grenzen für beide Server. `_vercel.js`: macht aus Konten und Chat je eine Vercel-Funktion.
 
 Die Seite (`src/`). Im Browser läuft ein Skript, das der Build aus diesen Dateien zusammensetzt:
 
 - `render.js`: baut aus Rapla-Daten das HTML (Kursplan, Kalenderdatei, Mensa), beim Build und im Browser.
 - `app.js`: welche Ansicht zu sehen ist, Kurse laden und aktuell halten. Richtet die anderen ein:
 - `timetable.js`: der Plan auf dem Bildschirm (Wochen, Modulfilter, „läuft gerade“).
-- `search.js`: die Kurssuche. `mensa.js`: die Mensa-Karte. `pwa.js`: Installieren und Offline. `account.js`: Konten und Notizen.
+- `search.js`: die Kurssuche. `mensa.js`: die Mensa-Karte. `pwa.js`: Installieren und Offline. `chat.js`: der Chat. `account.js`: Konten und Notizen.
 - `sw.js`: der Service Worker (eigene Datei, nicht Teil des Skripts).
 - `styles.css`: Aussehen.
 

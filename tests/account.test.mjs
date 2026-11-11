@@ -7,49 +7,18 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { startServer, person as personAt } from './_server.mjs';
 
-const PORT = 8139;
-const BASE = `http://localhost:${PORT}`;
-const root = fileURLToPath(new URL('..', import.meta.url));
-let server, log = '';
-
+const BASE = 'http://localhost:8139';
+let server;
 before(async () => {
-  server = spawn(process.execPath, ['serve.mjs', String(PORT)], { cwd: root, env: { ...process.env, PGLITE_DIR: 'memory', DATABASE_URL: '', RESEND_API_KEY: '' } });
-  server.stdout.on('data', (d) => { log += d; });
-  server.stderr.on('data', (d) => { log += d; });
-  for (let i = 0; i < 100 && !log.includes('läuft auf'); i++) await new Promise((r) => setTimeout(r, 100));
-  assert.match(log, /im Speicher/, 'server with an in-memory database');
+  server = await startServer(8139);
+  assert.match(server.log(), /im Speicher/, 'server with an in-memory database');
 });
-after(() => server.kill());
+after(() => server.stop());
 
-// a tiny client: JSON in and out, one cookie jar per "person"
-function person() {
-  let cookie = '';
-  return {
-    get cookie() { return cookie; },
-    set cookie(v) { cookie = v; },
-    async call(action, body, { method = body ? 'POST' : 'GET', headers = {}, raw } = {}) {
-      const res = await fetch(`${BASE}/api/account/${action}`, {
-        method,
-        headers: { ...(body || raw ? { 'Content-Type': 'application/json', Origin: BASE } : {}), ...(cookie ? { Cookie: cookie } : {}), ...headers },
-        body: raw ?? (body ? JSON.stringify(body) : undefined),
-      });
-      const set = res.headers.getSetCookie();
-      for (const c of set) cookie = /Max-Age=0/.test(c) ? '' : c.split(';')[0];
-      let data = null;
-      try { data = await res.json(); } catch { /* no body */ }
-      return { status: res.status, data, setCookie: set };
-    },
-  };
-}
-
-// the newest link of a kind from the server console (local mode: mails are printed there)
-function lastLink(kind) {
-  const links = [...log.matchAll(new RegExp(`konto=${kind}#token=([A-Za-z0-9_-]+)`, 'g'))];
-  return links.at(-1)?.[1];
-}
+const person = () => personAt(BASE);
+const lastLink = (kind) => server.lastLink(kind);
 
 const EMAIL = 'erika.musterfrau@student.dhbw-mannheim.de';
 const PASSWORD = 'Kaffee und Stundenplan 2026!';
@@ -120,7 +89,7 @@ test('no account enumeration: registering a taken address looks the same', async
   const fresh = await person().call('register', { email: 'max.neu@student.dhbw-mannheim.de', password: 'Ein anderes langes Passwort 1' });
   assert.equal(taken.status, fresh.status);
   assert.equal(taken.data.message.replace(EMAIL, '@'), fresh.data.message.replace('max.neu@student.dhbw-mannheim.de', '@'));
-  assert.match(log, /Du hast schon ein Konto/, 'the owner is told by mail instead');
+  assert.match(server.log(), /Du hast schon ein Konto/, 'the owner is told by mail instead');
 });
 
 test('a stranger signing up with your address gets nothing', async () => {

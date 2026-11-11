@@ -4,11 +4,13 @@
 // is an HttpOnly cookie this script never sees. Views live at ?konto=<view>.
 //
 // setupAccounts(app) is called once by app.js with what it needs from the page
-// ({ swap, showHome, loadCourse, byName, recent, setRecent, getCurrent }) and
+// ({ swap, showHome, loadCourse, byName, recent, setRecent, getCurrent, and
+// onAuth(), called when someone signs in or out or changes their name) and
 // returns the hooks app.js calls back:
 // - route(params): shows the account view an address asks for; false if it asks for none
 // - courseShown(name): a course was opened (save it, load its notes)
 // - decorate(): the plan was redrawn (put the notes back on it)
+// - available: a promise of whether this server has accounts at all
 function setupAccounts(app) {
   const MAX_NOTE = 2000; // as on the server (api/_account.js)
   const fNoteDate = new Intl.DateTimeFormat('de-DE', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -49,6 +51,7 @@ function setupAccounts(app) {
     const merged = [...(state.settings.recent || []), ...app.recent()].filter((n, i, all) => all.indexOf(n) === i && app.byName.has(n)).slice(0, 5);
     app.setRecent(merged);
     renderHeader();
+    app.onAuth();
   }
 
   function signedOut() {
@@ -58,6 +61,7 @@ function setupAccounts(app) {
     state.notesCourse = null;
     renderHeader();
     decorate();
+    app.onAuth();
   }
 
   // The server no longer knows this session (expired, or signed out elsewhere).
@@ -132,6 +136,10 @@ ${body}</section></div>`;
 <p class="form-message is-ok" data-flash role="status" hidden></p>
 <section class="account-section" aria-labelledby="sync-title"><h2 id="sync-title">Auf allen Geräten</h2>
 <p>Dein Kurs und die zuletzt geöffneten Kurse sind überall gleich, wo du angemeldet bist. Zu jeder Vorlesung kannst du eine private Notiz schreiben: im Plan auf <b>Notiz</b> tippen.</p></section>
+<section class="account-section" aria-labelledby="name-title"><h2 id="name-title">Name im Chat</h2>
+<p>So heißt du im Chat. Ohne Namen schreibst du als „Nutzer“ mit einer Nummer. Deine E-Mail-Adresse sieht dort niemand.</p>
+<form class="account-form" data-form="name" novalidate>${field('name', 'Anzeigename', { autocomplete: 'nickname', hint: '2 bis 24 Zeichen: Buchstaben, Ziffern, Leerzeichen und . _ -', extra: `maxlength="24" spellcheck="false" value="${esc(state.user.name || '')}"` })}${message}
+<button class="button" type="submit">Name speichern</button></form></section>
 <section class="account-section" aria-labelledby="notes-title"><h2 id="notes-title">Deine Notizen</h2><div data-notes-list><p class="muted">Wird geladen …</p></div></section>
 <section class="account-section" aria-labelledby="pw-title"><h2 id="pw-title">Passwort ändern</h2>
 <form class="account-form" data-form="password" novalidate><input type="email" name="username" autocomplete="username" value="${esc(state.user.email)}" hidden>
@@ -220,6 +228,15 @@ ${field('password', 'Neues Passwort', { type: 'password', autocomplete: 'new-pas
       linkToken = null;
       signedIn(r.data);
       show('konto', { push: false, flash: 'Neues Passwort gespeichert. Du bist angemeldet.' });
+    },
+    async name(form, values) {
+      const r = await api('name', { method: 'POST', body: { name: values.name } });
+      if (r.status === 401) return sessionEnded();
+      if (!r.ok) return setMessage(form, r.data.message || 'Das hat nicht geklappt.');
+      state.user = r.data.user;
+      form.querySelector('input[name="name"]').value = state.user.name;
+      setMessage(form, `Im Chat heißt du jetzt „${state.user.name}“.`, true);
+      app.onAuth();
     },
     async password(form, values) {
       const r = await api('password', { method: 'POST', body: { current: values.current, password: values.password } });
@@ -428,5 +445,5 @@ ${field('password', 'Neues Passwort', { type: 'password', autocomplete: 'new-pas
     if (current && state.user) courseShown(current);
   });
 
-  return { route, courseShown, decorate };
+  return { route, courseShown, decorate, available: ready.then(() => state.available) };
 }

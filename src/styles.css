@@ -1495,3 +1495,281 @@ body[data-view="home"] .foot {
   .note-dialog { transition: opacity 150ms ease; }
   @starting-style { .note-dialog[open] { transform: none; } }
 }
+
+/* ---------- chat: a button at the bottom right and its panel ---------- */
+
+.chat {
+  position: fixed;
+  z-index: 30;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+.chat[hidden] { display: none; }
+
+/* the page's last lines stay clear of the button */
+body.has-chat .foot { padding-bottom: 96px; }
+
+.chat-fab {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text);
+  color: var(--bg);
+  cursor: pointer;
+  /* the ring keeps it visible on the homepage's footer, which has its colour */
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.22), 0 0 0 2px var(--bg);
+  transition: transform 160ms var(--ease-out), opacity 150ms ease;
+}
+
+.chat-fab:active { transform: scale(0.97); }
+.chat-fab svg { width: 24px; height: 24px; }
+
+.chat-dot {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--accent-fill);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+.chat-dot[hidden] { display: none; }
+
+/* The panel is a popover of the button, so it grows out of the button's
+   corner. It opens in 200ms and closes faster; opened with the keyboard it
+   is simply there (.is-instant). Reduced motion keeps only the fade. */
+.chat-panel {
+  position: absolute;
+  right: 0;
+  bottom: 64px;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  width: min(380px, calc(100vw - 32px));
+  height: min(560px, calc(100dvh - 104px));
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.3), 0 0 0 1px var(--hairline);
+  overflow: hidden;
+  transform-origin: bottom right;
+  opacity: 0;
+  transform: scale(0.96);
+  visibility: hidden;
+  transition: opacity 120ms ease, transform 120ms ease, visibility 0s linear 120ms;
+}
+
+.chat.is-open .chat-panel {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out), visibility 0s;
+}
+
+.chat .chat-panel.is-instant { transition: none; }
+.chat-panel:focus { outline: none; }
+
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 6px 18px;
+}
+
+.chat-title { font-size: 1.0625rem; font-weight: 650; letter-spacing: -0.01em; }
+
+.chat-close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 160ms var(--ease-out);
+}
+
+.chat-close:active { transform: scale(0.97); }
+.chat-close svg { width: 14px; height: 14px; }
+
+.chat-rooms {
+  display: flex;
+  gap: 6px;
+  padding: 4px 14px 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.chat-rooms::-webkit-scrollbar { display: none; }
+.chat-rooms .chip { flex-shrink: 0; min-height: 32px; background: var(--surface-2); }
+.chat-rooms .chip[aria-pressed="true"] { background: var(--text); }
+
+.chat-body { position: relative; display: grid; min-height: 0; }
+
+.chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  margin: 0;
+  padding: 6px 14px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain; /* the page behind doesn't scroll when the list hits its end */
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-2) transparent;
+  list-style: none;
+}
+
+.chat-list:focus-visible { outline-offset: -3px; }
+
+.chat-state {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  text-align: center;
+  pointer-events: none;
+}
+
+.chat-state[hidden] { display: none; }
+
+.chat-msg { display: grid; justify-items: start; }
+.chat-msg.is-mine { justify-items: end; }
+
+.chat-day {
+  justify-self: center;
+  margin: 12px 0 2px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.chat-meta { margin: 8px 4px 3px; color: var(--muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.chat-meta b { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
+.chat-meta b.is-guest { color: var(--muted); }
+
+.chat-text {
+  max-width: 86%;
+  padding: 7px 12px;
+  border-radius: 16px;
+  background: var(--surface-2);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: hidden; /* stacked accents stay inside their bubble */
+}
+
+.chat-msg.is-mine .chat-text { background: var(--text); color: var(--bg); }
+
+.chat-new {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 8px;
+  width: max-content;
+  min-height: 32px;
+  margin-inline: auto;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.2);
+}
+
+.chat-new[hidden] { display: none; }
+
+.chat-form { display: grid; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid var(--hairline); }
+.chat-form .form-message { padding: 8px 12px; font-size: 0.875rem; }
+.chat-as { padding-inline: 4px; color: var(--muted); font-size: 0.8125rem; line-height: 1.4; }
+.chat-as b { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
+.chat-as a { text-underline-offset: 2px; }
+
+.chat-compose { display: flex; align-items: flex-end; gap: 8px; }
+
+.chat-compose textarea {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  min-height: 40px;
+  max-height: 120px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px; /* 16px or iOS zooms into the field */
+  line-height: 1.4;
+  resize: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.chat-compose textarea:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent);
+}
+
+.chat-compose textarea:disabled { opacity: 0.6; }
+
+.chat-send {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text);
+  color: var(--bg);
+  cursor: pointer;
+  transition: transform 160ms var(--ease-out), opacity 150ms ease;
+}
+
+.chat-send:active { transform: scale(0.97); }
+.chat-send svg { width: 18px; height: 18px; }
+.chat-send:disabled, .chat-send[aria-busy="true"] { opacity: 0.4; pointer-events: none; }
+
+@media (hover: hover) and (pointer: fine) {
+  .chat-fab:hover, .chat-send:hover, .chat-new:hover { opacity: 0.86; }
+  .chat-rooms .chip[aria-pressed="false"]:hover { background: var(--hairline); }
+}
+
+/* phones: the panel is a sheet across the bottom, over the button */
+@media (max-width: 599px) {
+  .chat-panel {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    height: min(640px, calc(100dvh - 72px));
+    transform-origin: bottom center;
+  }
+
+  .chat.is-open .chat-fab { opacity: 0; pointer-events: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-panel { transform: none; transition: opacity 120ms ease, visibility 0s linear 120ms; }
+  .chat.is-open .chat-panel { transition: opacity 150ms ease, visibility 0s; }
+  .chat-fab:active, .chat-close:active, .chat-send:active { transform: none; }
+}

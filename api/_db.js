@@ -35,6 +35,10 @@ export async function q(text, params = []) {
   return run(text, params);
 }
 
+// Every statement can run again on a database that already has it ("IF NOT
+// EXISTS"), so a new table or column is simply added to the list. The last
+// entry is what migrate() looks for: put new things before it, or make the
+// new thing the last entry and point LAST at it.
 export const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS users (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -79,13 +83,31 @@ export const SCHEMA = [
     count integer NOT NULL,
     reset_at timestamptz NOT NULL
   )`,
+  // the display name for the chat; unique whatever the capitals, so nobody can pose as someone else
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS name text`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS users_name ON users (lower(name))`,
+  // The chat. room: "global" or a course ("WWI26SEA"). user_id is null for
+  // guests; sender is a public id (a hash) that tells the page which
+  // messages are from the same person; name is what they were called then.
+  `CREATE TABLE IF NOT EXISTS chat_messages (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    room text NOT NULL,
+    user_id uuid REFERENCES users(id) ON DELETE CASCADE,
+    sender text NOT NULL,
+    name text NOT NULL,
+    body text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS chat_room ON chat_messages (room, id)`,
 ];
+const LAST = 'chat_room';
 
-// A cold start checks for the last table (one round trip) and only creates
-// the schema when it's missing. `npm run db:migrate` runs it unconditionally.
+// A cold start checks for the last entry of the schema (one round trip) and
+// only runs the statements when it's missing: on a new database, and once
+// after a deploy that added something. `npm run db:migrate` runs them unconditionally.
 export async function migrate(run = connect(), { force = false } = {}) {
   if (!force) {
-    const [row] = await run(`SELECT to_regclass('public.rate_limits') IS NOT NULL AS ok`, []);
+    const [row] = await run(`SELECT to_regclass($1) IS NOT NULL AS ok`, [`public.${LAST}`]);
     if (row?.ok) return;
   }
   for (const statement of SCHEMA) await run(statement, []);

@@ -60,7 +60,7 @@ const events = normalize(raw);
 // The page's script: these files in this order, in one scope. render.js runs
 // in the browser too (same code, without the module syntax); the others each
 // define one setup function, and app.js, last, calls them.
-const SCRIPTS = ['render.js', 'timetable.js', 'search.js', 'mensa.js', 'pwa.js', 'account.js', 'app.js'];
+const SCRIPTS = ['render.js', 'timetable.js', 'search.js', 'mensa.js', 'pwa.js', 'chat.js', 'account.js', 'app.js'];
 const script = `(() => {\n${SCRIPTS.map((name) => source(name).replace(/^export /gm, '')).join('\n')}\n})();`;
 // The files only meet here, so this is where a name declared twice or a typo
 // shows up: better a failed build than a page whose script doesn't start.

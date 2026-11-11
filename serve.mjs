@@ -7,9 +7,10 @@
 // - /api/courses, /api/rapla/lectures/<id>/events, /api/mensa: passed through
 //   to api.dhbw.app, which does not allow browsers to call it directly (the
 //   same code as the Vercel functions, api/_dhbw.js).
-// - /api/account/<action>: the accounts (api/_account.js), against
-//   DATABASE_URL from .env, or else a local Postgres (PGlite) in .data/.
-//   E-mails are not sent locally: their links appear in this console.
+// - /api/account/<action> and /api/chat/<action>: the accounts and the chat
+//   (api/_account.js, api/_chat.js), against DATABASE_URL from .env, or else
+//   a local Postgres (PGlite) in .data/. E-mails are not sent locally: their
+//   links appear in this console.
 // - /dev.html, the page with test data, is served from the project folder.
 // Every answer carries the security headers from vercel.json, as in production.
 
@@ -21,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { answer, HEADERS } from './api/_dhbw.js';
 import { useDatabase } from './api/_db.js';
 import { handleAccount } from './api/_account.js';
+import { handleChat } from './api/_chat.js';
 import { MAX_BODY, JSON_HEADERS, TOO_LARGE, BAD_REQUEST } from './api/_http.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -58,7 +60,9 @@ async function proxy(path, res) {
   res.writeHead(status, { ...HEADERS, 'Cache-Control': 'no-store' }).end(body);
 }
 
-// ---------- /api/account/<action> ----------
+// ---------- /api/account/<action>, /api/chat/<action> ----------
+
+const APIS = { account: handleAccount, chat: handleChat };
 
 // Reads at most MAX_BODY; anything beyond is read and dropped (up to 1 MB,
 // then the connection goes), so the client still gets its 413.
@@ -76,14 +80,14 @@ function readBody(req) {
   });
 }
 
-async function account(action, req, url, res) {
-  const send = (out) => res.writeHead(out.status, { ...JSON_HEADERS, ...(out.cookies.length ? { 'Set-Cookie': out.cookies } : {}) }).end(JSON.stringify(out.body));
+async function json(handle, action, req, url, res) {
+  const send = (out) => res.writeHead(out.status, { ...JSON_HEADERS, ...out.headers, ...(out.cookies.length ? { 'Set-Cookie': out.cookies } : {}) }).end(JSON.stringify(out.body));
   if (Number(req.headers['content-length'] || 0) > MAX_BODY) {
     res.setHeader('Connection', 'close');
     return send(TOO_LARGE);
   }
   let body = null;
-  // only JSON is read; anything else reaches handleAccount without a body and is refused there (CSRF)
+  // only JSON is read; anything else reaches the API without a body and is refused there (CSRF)
   if (req.method !== 'GET' && req.method !== 'HEAD' && /^application\/json\b/i.test(req.headers['content-type'] || '')) {
     try {
       const text = await readBody(req);
@@ -92,7 +96,7 @@ async function account(action, req, url, res) {
       return send(err === TOO_LARGE ? TOO_LARGE : BAD_REQUEST);
     }
   }
-  send(await handleAccount({
+  send(await handle({
     method: req.method, action, query: Object.fromEntries(url.searchParams), body, headers: req.headers,
     ip: req.socket.remoteAddress, ctx: { dev: true, origin },
   }));
@@ -120,7 +124,8 @@ const server = createServer(async (req, res) => {
     try { path = decodeURIComponent(url.pathname); } catch { res.writeHead(400).end(); return; } // "/%E0" is not a path
     for (const [k, v] of Object.entries(headersFor(url.pathname))) res.setHeader(k, v);
 
-    if (path.startsWith('/api/account/')) await account(path.slice('/api/account/'.length), req, url, res);
+    const name = path.startsWith('/api/') ? path.split('/')[2] : ''; // "/api/chat/send" → "chat"
+    if (Object.hasOwn(APIS, name)) await json(APIS[name], path.slice(`/api/${name}/`.length), req, url, res);
     else if (path.startsWith('/api/')) await proxy(path.slice('/api'.length), res);
     else await file(path, req, res);
   } catch (err) {

@@ -2,7 +2,7 @@
 // account page), opening courses in place, and keeping what is shown in step
 // with the clock and with Rapla. The parts live in their own files and are
 // set up here: timetable.js (a plan's live state), search.js, mensa.js,
-// pwa.js (install and offline), account.js. render.js makes the markup.
+// pwa.js (install and offline), chat.js, account.js. render.js makes the markup.
 //
 // build.mjs joins these files into one script in the page; this one runs last.
 (() => {
@@ -295,11 +295,16 @@
   const headerInput = document.getElementById('course-search');
   if (headerInput) combobox(headerInput, document.getElementById('course-list'));
 
+  const chat = setupChat({ recent, current: () => current });
+
   account = setupAccounts({
     swap, showHome, loadCourse, byName, recent,
     setRecent: (list) => write(RECENT, list),
     getCurrent: () => current,
+    onAuth: () => chat.identityChanged(),
   });
+  // the chat needs the same database as the accounts: no button without it
+  account.available.then((yes) => { if (yes) chat.enable(); });
 
   // ---------- getting around ----------
 
@@ -357,6 +362,7 @@
     mensa.render();
     mensa.load();
     pwa.showInstall();
+    chat.rooms(); // the course on screen is one of the chat's rooms
 
     if (document.getElementById('hero-search')) setupHome();
   }
