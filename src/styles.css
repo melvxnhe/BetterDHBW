@@ -304,7 +304,7 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
   white-space: nowrap;
 }
 
-.brand strong { font-weight: 650; letter-spacing: -0.01em; }
+.brand strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 650; letter-spacing: -0.01em; }
 .brand span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -363,6 +363,8 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
   line-height: 1;
   font-weight: 700;
   letter-spacing: -0.035em;
+  /* the longest codes ("WOW23B---VERSORGUNGSWIRTSCHAFT") are wider than a phone */
+  overflow-wrap: anywhere;
 }
 
 /* "Wirtschaftsinformatik – Software Engineering 26": what the code stands for */
@@ -1064,7 +1066,8 @@ body[data-view="home"] .bar.show-search .search { opacity: 1; pointer-events: au
 .link-button { padding: 0; border: 0; background: none; color: var(--text); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .link-button[hidden] { display: none; }
 .hero-recent { color: var(--muted); }
-.hero-recent a { margin-left: 6px; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* inline-block: a code moves to the next line whole instead of breaking after "TMB22PJM-" */
+.hero-recent a { display: inline-block; max-width: 100%; margin-left: 6px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* the right half: a real piece of the timetable on a flat stage */
 .hero-stage {
@@ -1390,6 +1393,7 @@ body[data-view="home"] .foot {
 
 .form-message {
   padding: 10px 14px;
+  overflow-wrap: anywhere; /* it can quote a long address back */
   border-radius: 12px;
   background: var(--accent-soft);
   color: var(--accent);

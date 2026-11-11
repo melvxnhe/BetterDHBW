@@ -132,7 +132,8 @@ ${body}</section></div>`;
     },
     konto: {
       title: 'Konto',
-      html: () => card('Dein Konto', esc(state.user.email), `
+      // <wbr> after @ and dots: a long address breaks there, not inside "dhbw-mannheim"
+      html: () => card('Dein Konto', esc(state.user.email).replace(/[@.]/g, '$&<wbr>'), `
 <p class="form-message is-ok" data-flash role="status" hidden></p>
 <section class="account-section" aria-labelledby="sync-title"><h2 id="sync-title">Auf allen Geräten</h2>
 <p>Dein Kurs und die zuletzt geöffneten Kurse sind überall gleich, wo du angemeldet bist. Zu jeder Vorlesung kannst du eine private Notiz schreiben: im Plan auf <b>Notiz</b> tippen.</p></section>
@@ -270,7 +271,7 @@ ${field('password', 'Neues Passwort', { type: 'password', autocomplete: 'new-pas
     if (!r.ok) { slot.innerHTML = '<p class="muted">Notizen konnten nicht geladen werden.</p>'; return; }
     const notes = r.data.notes || [];
     if (!notes.length) { slot.innerHTML = '<p class="muted">Noch keine. Im Stundenplan bei einer Vorlesung auf „Notiz“ tippen.</p>'; return; }
-    slot.innerHTML = `<ul class="note-list">${notes.map((n) => `<li><p class="note-list-head"><a href="?kurs=${encodeURIComponent(n.course)}" data-course-link="${esc(n.course)}">${esc(n.course)}</a> · ${esc(n.eventName || 'Termin')}${n.eventStart ? ` · ${esc(fNoteDate.format(new Date(n.eventStart)))}` : ''}</p><p class="note-list-body">${esc(n.body)}</p></li>`).join('')}</ul>`;
+    slot.innerHTML = `<ul class="note-list">${notes.map((n) => `<li><p class="note-list-head"><a href="?kurs=${encodeURIComponent(n.course)}" data-course-link="${esc(n.course)}">${esc(n.course)}</a> · ${esc(n.eventName || 'Termin')}${n.eventStart ? ` · ${esc(fNoteDate.format(new Date(n.eventStart)))}` : ''}</p><p class="note-list-body" dir="auto">${esc(n.body)}</p></li>`).join('')}</ul>`;
   }
 
   function download(name, data) {
@@ -372,7 +373,7 @@ ${field('password', 'Neues Passwort', { type: 'password', autocomplete: 'new-pas
       button.textContent = note ? 'Notiz bearbeiten' : 'Notiz';
       button.setAttribute('aria-label', `${note ? 'Notiz bearbeiten' : 'Notiz schreiben'}: ${s.querySelector('.session-title').textContent}`);
       if (note) {
-        if (!text) { text = Object.assign(document.createElement('p'), { className: 'session-note' }); button.before(text); }
+        if (!text) { text = Object.assign(document.createElement('p'), { className: 'session-note', dir: 'auto' }); button.before(text); }
         text.textContent = note.body; // as text, never as HTML
       } else {
         text?.remove();

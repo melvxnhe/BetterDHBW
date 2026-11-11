@@ -151,11 +151,12 @@ function setupChat({ recent, current }) {
     if (newDay || previous.from !== m.from || at - Date.parse(previous.at) > GROUP) {
       const head = document.createElement('p');
       head.className = 'chat-meta';
-      if (!mine) head.append(Object.assign(document.createElement('b'), { textContent: m.name, className: m.guest ? 'is-guest' : '' }), ' ');
+      // dir="auto": an Arabic name or message reads right to left, its punctuation included
+      if (!mine) head.append(Object.assign(document.createElement('b'), { textContent: m.name, className: m.guest ? 'is-guest' : '', dir: 'auto' }), ' ');
       head.append(Object.assign(document.createElement('time'), { dateTime: new Date(at).toISOString(), textContent: fTime.format(at) }));
       item.append(head);
     }
-    item.append(Object.assign(document.createElement('p'), { className: 'chat-text', textContent: m.body }));
+    item.append(Object.assign(document.createElement('p'), { className: 'chat-text', textContent: m.body, dir: 'auto' }));
     return item;
   }
 

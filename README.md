@@ -120,7 +120,7 @@ Unter `/admin`, für den Betreiber: Zahlen auf einen Blick, Chat-Nachrichten lö
 ## Dateien
 
 - `public/index.html`: die fertige Seite (CSS und JS eingebettet): Startseite, und jeder Kurs unter `?kurs=…`. Wird gebaut, nicht eingecheckt.
-- `dev.html`: nur zum Testen (lokal unter http://localhost:8137/dev.html), mit Worst-Case-Daten zum Umschalten. Liegt absichtlich nicht in `public/` und wird nicht deployt.
+- `dev.html`: nur zum Testen (lokal unter http://localhost:8137/dev.html). Die echte Seite gegen eine Fake-API mit vier Datensätzen zum Umschalten (Demo, Worst case, Leer, Ein Termin): Termine, Mensa, Konto mit Notizen und Chat. Die Leiste unten wechselt Datensatz und Ansicht (Start, Kurs, Konto, Registrieren); `__overflow()` in der Konsole listet, was seitlich herausragt. Liegt absichtlich nicht in `public/` und wird nicht deployt.
 - `build.mjs`: holt die Daten und baut alles. Nach Änderungen in `src/` neu ausführen.
 - `serve.mjs`: kleiner lokaler Server: die gebaute Seite, die Weiterleitung zu api.dhbw.app und die Konten.
 - `vercel.json`: Build-Befehl, Ausgabeordner und Sicherheits-Header für Vercel.
@@ -145,4 +145,4 @@ Die Seite (`src/`). Im Browser läuft ein Skript, das der Build aus diesen Datei
 
 Nur für den Build:
 
-- `catalog.js`: die Kursliste (Kürzel, Studiengang, Studienrichtung). `home.js`: die Startseite. `page.js`: der Rahmen jeder Seite und die Content-Security-Policy. `dev.js`: die Testdaten für `dev.html`. `icon.mjs`: die App-Icons.
+- `catalog.js`: die Kursliste (Kürzel, Studiengang, Studienrichtung). `home.js`: die Startseite. `page.js`: der Rahmen jeder Seite und die Content-Security-Policy. `dev.js`: die Testdaten und die Fake-API für `dev.html`. `icon.mjs`: die App-Icons.

@@ -15,10 +15,14 @@ function setupTimetable() {
   const fKey = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
   const dayKey = (t) => fKey.format(t);
   const daysBetween = (a, b) => Math.round((Date.parse(dayKey(b)) - Date.parse(dayKey(a))) / 864e5);
-  const fromTo = (a, b) => `${fTime.format(a)} – ${fTime.format(b)}`;
+  const fromTo = (a, b) => spanText(a, b); // render.js: "08:45 – 13:15", "ganztägig", …
 
   const duration = (min) => {
     if (min < 60) return `${min} Min.`;
+    if (min >= 24 * 60) { // a project week: "2 Tage 3 Std.", not "51 Std. 9 Min."
+      const d = Math.floor(min / (24 * 60)), h = Math.floor((min % (24 * 60)) / 60);
+      return `${d} ${d === 1 ? 'Tag' : 'Tage'}${h ? ` ${h} Std.` : ''}`;
+    }
     const h = Math.floor(min / 60), m = min % 60;
     return m ? `${h} Std. ${m} Min.` : `${h} Std.`;
   };
@@ -218,7 +222,8 @@ function setupTimetable() {
 
     // the card at the top: what is running, else what comes next
     function updateNow(running, next, t) {
-      const live = running[0] || null;
+      // of several at once, the one that ends first: the lecture, not the project week around it
+      const live = running.slice().sort((x, y) => span(x)[1] - span(y)[1])[0] || null;
       const pick = live || next;
       const label = now.querySelector('.now-label-text');
       const title = now.querySelector('.now-title');

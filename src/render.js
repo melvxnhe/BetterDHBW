@@ -32,7 +32,18 @@ export const mondayOf = (p) => addDays(utc(p), -weekdayIndex(utc(p)));
 
 export const keyOf = (p) => `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
 export const hm = (p) => `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`;
-const fromTo = (e) => `${hm(partsOf(e.start))} – ${hm(partsOf(e.end))}`;
+// When something runs, as [from, to]: ["08:45", "13:15"]. Rapla stores
+// all-day entries as 00:00 to 00:00, which reads as nothing: ["ganztägig"].
+// Entries over several days name the day they end: ["08:00", "Fr 13.11., 17:00"].
+export function spanParts(start, end) {
+  const a = partsOf(start), b = partsOf(end);
+  const days = Math.round((utc(b) - utc(a)) / 864e5);
+  const dayText = (p) => `${DAY_SHORT[weekdayIndex(utc(p))]} ${p.day}.${p.month}.`;
+  if (days >= 1 && hm(a) === '00:00' && hm(b) === '00:00') return days === 1 ? ['ganztägig'] : [`ganztägig bis ${dayText(dayOf(addDays(utc(b), -1)))}`];
+  return [hm(a), days >= 1 ? `${dayText(b)}, ${hm(b)}` : hm(b)];
+}
+export const spanText = (start, end) => spanParts(start, end).join(' – ');
+const fromTo = (e) => spanText(e.start, e.end);
 const weekdayOf = (p) => WEEKDAYS[weekdayIndex(utc(p))];
 const longDate = (p) => `${p.day}. ${MONTHS[p.month - 1]}`;
 const num = (n) => (Math.round(n * 10) / 10).toLocaleString('de-DE');
@@ -50,7 +61,7 @@ const isoWeek = (p) => {
 // Soft hyphens at the joints of long German compounds. CSS `hyphens: auto`
 // has no German dictionary in Chrome on Windows, so narrow columns would
 // otherwise break "Betriebswirtschaftslehr|e" anywhere.
-const JOINTS = /(?<=\p{L}{3})(wirtschaft|informatik|lehre|vertretung|entwicklung|projekt|studium|prüfung|leistung|veranstaltung|engineering|management|tutorien|konzepte|technik|rechnung|wissenschaft|systeme)/giu;
+const JOINTS = /(?<=\p{L}{3})(wirtschaft|informatik|lehre|vertretung|entwicklung|projekt|studium|prüfung|leistung|veranstaltung|engineering|management|tutorien|konzepte|technik|rechnung|wissenschaft|systeme|modellierung|werkzeuge|verordnung|umsetzung|workshop)/giu;
 const title = (s) => esc(s).replace(/\p{L}{13,}/gu, (w) => w.replace(JOINTS, '&shy;$1'));
 
 // ---------- events ----------
@@ -143,10 +154,10 @@ export function toWeeks(block) {
 
 // `heading`: h4 inside a week; the homepage preview has no headings above it and passes p
 function sessionHTML(e, heading = 'h4') {
-  const s = partsOf(e.start), en = partsOf(e.end);
+  const [from, to] = spanParts(e.start, e.end);
   const meta = [e.room, hours(e.hours)].filter(Boolean).join(' · ');
   return `<article class="session" data-id="${esc(String(e.id ?? ''))}" data-module="${e.module}" data-start="${e.start}" data-end="${e.end}" data-room="${esc(e.room)}">
-${e.exam ? `<span class="session-tag">${esc(e.exam)}</span>` : ''}<p class="session-time"><time datetime="${new Date(e.start).toISOString()}">${hm(s)}</time> – <time datetime="${new Date(e.end).toISOString()}">${hm(en)}</time></p>
+${e.exam ? `<span class="session-tag">${esc(e.exam)}</span>` : ''}<p class="session-time"><time datetime="${new Date(e.start).toISOString()}">${from}</time>${to ? ` – <time datetime="${new Date(e.end).toISOString()}">${to}</time>` : ''}</p>
 <${heading} class="session-title">${title(e.name)}</${heading}>
 <p class="session-meta">${esc(meta)}</p>
 <p class="session-status"></p>
@@ -247,7 +258,7 @@ export function mainHTML(events, { course, full = '', now = Date.now() } = {}) {
 ${full ? `<p class="title-full">${esc(full)}</p>` : ''}
 <p class="subtitle">${subtitle}</p>
 </div>
-${nowCardHTML(block, now)}
+${block.length ? nowCardHTML(block, now) : ''}
 </section>
 
 ${weeks.length ? `<div class="controls">
@@ -374,10 +385,18 @@ ${col('greenes²', day.greenes)}
 
 // A real piece of the timetable for the hero: one course's now card and its
 // next day with lectures. The page script keeps it live like the real plan.
+// The entry whose day the preview shows: the next one that starts today or
+// later. Something that began days ago and still runs (a project week) would
+// otherwise pull the preview back to the day it started.
+export function previewEvent(block, now) {
+  const today = keyOf(partsOf(now));
+  return block.find((e) => e.end > now && keyOf(partsOf(e.start)) >= today) || block.find((e) => e.end > now) || block.at(-1);
+}
+
 export function previewHTML(course, events, now) {
   const { block } = splitBlock(events, now);
   if (!block.length) return '';
-  const upcoming = block.find((e) => e.end > now) || block.at(-1);
+  const upcoming = previewEvent(block, now);
   const key = keyOf(partsOf(upcoming.start));
   const day = block.filter((e) => keyOf(partsOf(e.start)) === key);
   const p = partsOf(upcoming.start);

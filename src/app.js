@@ -15,7 +15,7 @@
   const catalog = JSON.parse(document.getElementById('course-data')?.textContent || '{"courses":[]}');
   const courses = catalog.courses;
   const byName = new Map(courses.map((c) => [c.name, c]));
-  const isDev = !!document.querySelector('template[data-fixture]'); // dev.html: test data, nothing is fetched
+  const isDev = !!window.__dev; // dev.html: a fake API with test data (src/dev.js), and no service worker
   const bar = document.querySelector('.bar');
   const onHome = () => document.body.dataset.view === 'home';
   const courseUrl = (name) => `?kurs=${encodeURIComponent(name)}`;
@@ -253,12 +253,14 @@
     if (current !== null || !stage || !sample.name) return;
     const now = Date.now();
     const { block } = splitBlock(sample.events, now);
-    const next = block.find((e) => e.end > now) || block.at(-1);
+    const next = block.length ? previewEvent(block, now) : null;
     const key = next ? keyOf(partsOf(next.start)) : '';
     if (!force && key === sample.key) return; // still the same day: the clock keeps it live
-    const html = previewHTML(sample.name, sample.events, now);
-    if (!html) return;
     sample.key = key;
+    // Rapla has nothing (more) for the sample course: no preview rather than the one from the build
+    const html = previewHTML(sample.name, sample.events, now);
+    stage.hidden = !html;
+    stage.closest('.hero')?.classList.toggle('is-single', !html);
     stage.innerHTML = html;
     start();
   }
@@ -407,7 +409,6 @@
 
   // ---------- first view: an account page or a course from the address, else the homepage ----------
 
-  if (isDev) return;
   const params = new URLSearchParams(location.search);
   const wanted = (params.get('kurs') || '').toUpperCase();
   // Launched as an installed app without a course in the address, the app

@@ -93,7 +93,8 @@ main.panel h2 { margin: 32px 0 10px; font-size: 1.125rem; }
 button.link { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
-.toolbar label { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.875rem; }
+.toolbar label { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; color: var(--muted); font-size: 0.875rem; }
+.toolbar select { min-width: 0; max-width: 100%; } /* as wide as its longest room, "WOW23B---VERSORGUNGSWIRTSCHAFT", without this */
 .toolbar input { flex: 1; min-width: 180px; }
 .more { margin-top: 12px; }
 
@@ -263,12 +264,12 @@ function panelScript() {
     const reload = () => loadMessages();
     return el('li', { class: 'row' },
       el('p', { class: 'row-head' },
-        el('b', { text: m.name }),
+        el('b', { text: m.name, dir: 'auto' }),
         el('span', { text: m.email || 'Gast' }),
         el('span', { class: 'tag', text: roomName(m.room) }),
         m.banned ? el('span', { class: 'tag warn', text: 'gesperrt' }) : null,
         el('span', { text: when(m.at) })),
-      el('p', { class: 'row-text', text: m.body }),
+      el('p', { class: 'row-text', text: m.body, dir: 'auto' }),
       el('div', { class: 'row-actions' },
         button('Löschen', () => change('delete-message', { id: m.id }, { done: 'Nachricht gelöscht.', then: reload }), 'danger'),
         button('Alles von diesem Absender löschen', () => change('delete-sender', { sender: m.sender }, {
@@ -309,7 +310,8 @@ function panelScript() {
     return el('li', { class: 'row' },
       el('p', { class: 'row-head' },
         el('b', { text: u.email }),
-        el('span', { text: u.name ? `im Chat: ${u.name}` : 'ohne Anzeigename' }),
+        // <bdi>: an Arabic name stays in its own direction and leaves "im Chat:" alone
+        u.name ? el('span', {}, 'im Chat: ', el('bdi', { text: u.name })) : el('span', { text: 'ohne Anzeigename' }),
         el('span', { text: `seit ${when(u.createdAt)}` }),
         el('span', { text: `${u.notes} ${u.notes === 1 ? 'Notiz' : 'Notizen'} · ${u.messages} ${u.messages === 1 ? 'Nachricht' : 'Nachrichten'}` })),
       el('div', { class: 'row-actions' },

@@ -16,11 +16,11 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { Script } from 'node:vm';
 import { iconSVG, iconPNG } from './src/icon.mjs';
-import { normalize, mainHTML, splitBlock, toWeeks, partsOf, hm } from './src/render.js';
+import { normalize, splitBlock, toWeeks, partsOf, hm } from './src/render.js';
 import { courseList } from './src/catalog.js';
 import { homeHTML, homeFooterHTML } from './src/home.js';
 import { pageHTML, withCsp } from './src/page.js';
-import { worstCase, devSwitcher, DEV_STYLE, DEV_START } from './src/dev.js';
+import { devData, devTail, DEV_STYLE } from './src/dev.js';
 
 const API = 'https://api.dhbw.app';
 const TITLE = 'Stundenpläne der DHBW Mannheim';
@@ -116,13 +116,10 @@ const sw = source('sw.js');
 const version = createHash('sha256').update(html).update(sw).update(JSON.stringify(manifest)).digest('hex').slice(0, 12);
 writeFileSync('public/sw.js', sw.replace('__VERSION__', version));
 
-// ---------- dev page: worst-case data behind a toggle (break-ui) ----------
+// ---------- dev page: the page against a fake API with worst-case data (break-ui) ----------
 
-const fixtures = { 'Demo': events, 'Worst case': normalize(worstCase(raw)), 'Leer': [], 'Ein Termin': normalize(raw.slice(0, 1)) };
-const plans = Object.fromEntries(Object.entries(fixtures).map(([name, list]) => [name, mainHTML(list, { course: course.name, full: course.full, now: builtAt })]));
-// no CSP here: the switcher brings its own inline script
-writeFileSync('dev.html', pageHTML({ ...page, title: `${TITLE} (Testdaten)`, head: DEV_STYLE, tail: devSwitcher(plans) })
-  .replace('</body>', `${DEV_START}\n</body>`));
+// no CSP here: the fake API comes as an inline script
+writeFileSync('dev.html', pageHTML({ ...page, title: `${TITLE} (Testdaten)`, head: DEV_STYLE, tail: devTail(devData(raw, builtAt)) }));
 
 const { block } = splitBlock(events, builtAt);
 console.log(`index.html: Startseite mit ${courses.length} Kursen, Vorschau ${course.name} (${block.length} Termine in ${toWeeks(block).length} Wochen) · Stand ${hm(partsOf(builtAt))} Uhr`);
