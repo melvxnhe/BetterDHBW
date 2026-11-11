@@ -1,9 +1,9 @@
-// The page itself: which view is on screen (the homepage, a course, an
-// account page), opening courses in place, and keeping what is shown in step
+// The page itself: which view is on screen (the homepage, a course, the
+// Freistunden-Matcher, an account page), opening courses in place, and keeping what is shown in step
 // with the clock and with Rapla. The parts live in their own files and are
 // set up here: timetable.js (a plan's live state), search.js, mensa.js,
-// pwa.js (install and offline), chat.js, settings.js (the theme), account.js.
-// render.js makes the markup.
+// pwa.js (install and offline), match.js (Freistunden), chat.js,
+// settings.js (the theme), account.js. render.js makes the markup.
 //
 // build.mjs joins these files into one script in the page; this one runs last.
 (() => {
@@ -48,6 +48,7 @@
     refreshSample();
     mensa.load();
     mensa.render();
+    match.tick();
     view?.update();
   }
 
@@ -300,6 +301,11 @@
 
   setupSettings();
 
+  const match = setupMatch({
+    swap, start, fetchEvents, byName,
+    combobox: (open, other) => setupSearch({ courses, byName, recent, current: other, open }),
+  });
+
   const chat = setupChat({ recent, current: () => current });
 
   account = setupAccounts({
@@ -326,10 +332,13 @@
   // links to courses and to the homepage swap the view instead of loading the page again
   document.addEventListener('click', (e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return;
-    const link = e.target.closest('[data-course-link], [data-home]');
+    const link = e.target.closest('[data-course-link], [data-home], [data-match-link]');
     if (!link) return;
     e.preventDefault();
-    if (link.hasAttribute('data-home')) {
+    if (link.hasAttribute('data-match-link')) {
+      // from a course: that one; from the homepage: the course opened last
+      match.open([link.dataset.matchLink || recent()[0]].filter(Boolean), { animate: e.detail !== 0 });
+    } else if (link.hasAttribute('data-home')) {
       // from a course or an account page; on the homepage itself the logo scrolls to the top
       if (!onHome()) showHome({ animate: e.detail !== 0 });
       else window.scrollTo({ top: 0, behavior: reduceMotion.matches ? 'instant' : 'smooth' });
@@ -340,7 +349,7 @@
 
   addEventListener('popstate', () => {
     const params = new URLSearchParams(location.search);
-    if (account.route(params)) return;
+    if (account.route(params) || match.route(params)) return;
     const name = (params.get('kurs') || '').toUpperCase();
     if (byName.has(name)) { if (name !== current) loadCourse(name, { push: false, animate: false }); }
     else if (!onHome()) showHome({ push: false });
@@ -421,6 +430,8 @@
   const first = byName.has(wanted) ? wanted : last;
   if (account.route(params)) {
     // ?konto=…: sign-in, sign-up, e-mail links, the account page
+  } else if (match.route(params)) {
+    // ?frei=…: the Freistunden-Matcher
   } else if (first) {
     if (first !== wanted) history.replaceState({ kurs: first }, '', courseUrl(first));
     document.body.dataset.view = 'course';

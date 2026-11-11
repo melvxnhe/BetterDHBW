@@ -1895,3 +1895,128 @@ body.has-chat .foot { padding-bottom: 96px; }
   @starting-style { .settings:popover-open { transform: none; } }
   .swatch:active { transform: none; }
 }
+
+/* ---------- Freistunden-Matcher (?frei=A,B) ---------- */
+
+body[data-view="match"] .bar [data-ics] { display: none; }
+
+/* on a course page: the way to the matcher, under the subtitle */
+.intro-link { margin-top: 12px; font-size: 0.9375rem; }
+.intro-link a { color: var(--text); text-underline-offset: 3px; }
+
+.match-intro { padding-bottom: 20px; }
+
+.match-pick {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 12px 16px;
+  max-width: 720px;
+  margin-bottom: 24px;
+}
+
+.match-field { display: grid; gap: 6px; }
+.match-label { font-size: 0.875rem; font-weight: 600; }
+.match-field .search-field { height: 46px; background: var(--surface); }
+.match-field .search-list { inset: calc(100% + 6px) 0 auto 0; }
+
+.match-hint { max-width: 720px; }
+.match-out[aria-busy="true"] .match-hint { opacity: 0.6; }
+
+/* who is which colour; the same three bars in every day below */
+.match-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 14px; color: var(--muted); font-size: 0.875rem; }
+.match-legend span { display: inline-flex; align-items: center; gap: 7px; overflow-wrap: anywhere; }
+.match-legend span::before { content: ""; width: 14px; height: 8px; flex-shrink: 0; border-radius: 4px; background: var(--c); }
+
+.match-legend .is-a, .match-bar.is-a { --c: var(--m0); }
+.match-legend .is-b, .match-bar.is-b { --c: var(--m3); }
+.match-legend .is-free, .match-bar.is-free { --c: var(--m1); }
+
+.match-note { margin-bottom: 14px; color: var(--muted); font-size: 0.9375rem; line-height: 1.45; }
+
+/* the next time both are free, like the now card on a course page */
+.match-next {
+  max-width: 720px;
+  margin-bottom: 28px;
+  padding: 18px 22px 20px;
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.match-next-label { color: var(--muted); font-size: 0.875rem; font-weight: 600; }
+.match-next.is-live .match-next-label { color: var(--m1); }
+.match-next-title { margin-top: 6px; font-size: clamp(1.25rem, 2.6vw, 1.625rem); line-height: 1.2; font-weight: 650; letter-spacing: -0.02em; }
+.match-next-meta { margin-top: 6px; color: var(--muted); }
+
+/* A day: its name, three bars over the week's hours (--lo to --hi, set on the
+   week), and the Freistunden as text. On wide screens the name sits left of
+   the bars, on phones above them. */
+.match-days { display: grid; gap: 8px; }
+
+.match-day.day {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  grid-template-areas: "head bars" ". text";
+  align-items: center;
+  gap: 8px 18px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.match-day .day-head { grid-area: head; flex-direction: row; align-items: baseline; padding-top: 0; }
+.match-day .match-bars { grid-area: bars; }
+.match-day .match-gaps, .match-day .match-none { grid-area: text; }
+.match-day.is-free { background: color-mix(in srgb, var(--surface) 55%, transparent); }
+
+/* the hours above the bars, in the same columns */
+.match-axis {
+  position: relative;
+  height: 16px;
+  margin: 0 16px 0 calc(16px + 9rem + 18px);
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.match-axis span { position: absolute; left: calc((var(--s) - var(--lo)) / (var(--hi) - var(--lo)) * 100%); transform: translateX(-50%); }
+
+.match-bars { display: grid; gap: 4px; }
+
+.match-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.match-bar i {
+  position: absolute;
+  inset-block: 0;
+  left: calc((var(--s) - var(--lo)) / (var(--hi) - var(--lo)) * 100%);
+  width: calc((var(--e) - var(--s)) / (var(--hi) - var(--lo)) * 100%);
+  border-radius: 5px;
+  background: var(--c);
+}
+
+.match-gaps { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+
+.match-gaps li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--m1) 14%, transparent);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.match-gaps b { font-weight: 650; }
+.match-gaps span { color: var(--muted); }
+.match-none { color: var(--muted); font-size: 0.875rem; }
+
+@media (max-width: 719px) {
+  .match-day.day { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "bars" "text"; }
+  .match-axis { margin: 0 16px; }
+}

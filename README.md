@@ -50,6 +50,16 @@ Das Repo ist fertig für Vercel, `vercel.json` stellt alles ein:
 - Heute und die nächsten Tage mit Speiseplan (fünf insgesamt), geöffnet wird heute. Nach 14:00 steht dabei, dass die Ausgabe schon geschlossen hat.
 - Daten vom Studierendenwerk über api.dhbw.app (`/api/mensa`, auf Metropol gekürzt), stündlich neu geladen.
 
+## Freistunden
+
+Unter `?frei=WWI26SEA,TINF25CS1`: zwei Kurse nebeneinander, Woche für Woche, und wann ihr beide frei habt. Erreichbar über „Freistunden finden“ auf der Startseite (mit dem zuletzt geöffneten Kurs vorausgewählt) und „Freistunden mit einem anderen Kurs finden“ auf jeder Kursseite.
+
+- Pro Tag drei Balken über die Stunden der Woche: Kurs 1, Kurs 2, beide frei. Darunter die gemeinsamen Freistunden als Text, und ab wann beide fertig sind.
+- Freistunde heißt: beide mindestens 30 Minuten ohne Termin, zwischen der ersten und der letzten Vorlesung des Tages (kürzere Lücken sind nur Pausen). Ganztägige und mehrtägige Einträge zählen als besetzt.
+- Oben steht, wann ihr als Nächstes gemeinsam frei habt; die Karte zählt mit der Uhr mit.
+- Verglichen wird, was jeder Kurs gerade zeigt (laufende Theoriephase, sonst die nächste). Hat ein Kurs nichts eingetragen (Praxisphase), sagt die Seite das.
+- Logik und Markup: `matchDay`, `matchWeeks`, `matchHTML` in `src/render.js` (Tests in `tests/match.test.mjs`); die Ansicht mit den zwei Kurswahlen: `src/match.js`.
+
 ## Einstellungen
 
 - Der Knopf rechts oben (Schieberegler) öffnet die Einstellungen: Darstellung „Automatisch“ (wie das Gerät), „Hell“ oder „Dunkel“, und eine Akzentfarbe (Rot, Blau, Grün, Lila, Orange) für heute, was gerade läuft und die Prüfungen. Fehler und Löschen bleiben rot.
@@ -72,7 +82,7 @@ Anmelden ist freiwillig; der Stundenplan geht ohne. Mit Konto sind Kurs und zule
 - Server: `api/account.js` → `api/_account.js` (alle Regeln), mit `api/_password.js` (Passwörter), `api/_mail.js` (E-Mails) und der Datenbank `api/_db.js` (Neon Postgres; Tabellen legt sie beim ersten Aufruf selbst an, oder `npm run db:migrate`).
 - Seite: `src/account.js` (Anmelden, Registrieren, Konto, Notizen), Adressen `?konto=anmelden`, `?konto=registrieren`, `?konto=konto`.
 - Lokal (`npm start`) ohne `DATABASE_URL`: eine Postgres-Datenbank in `.data/` (PGlite), E-Mails erscheinen in der Konsole.
-- `npm test`: 42 Angriffstests gegen frische Server (fremde Domains, schwache Passwörter, CSRF, SQL-Injection, fremde Notizen, Sperren, Chat-Fluten, Adminbereich ohne Anmeldung, …).
+- `npm test`: 42 Angriffstests gegen frische Server (fremde Domains, schwache Passwörter, CSRF, SQL-Injection, fremde Notizen, Sperren, Chat-Fluten, Adminbereich ohne Anmeldung, …) und 9 Tests für die Freistunden-Berechnung.
 
 ## Chat
 
@@ -143,10 +153,10 @@ Der Server (`api/`, als Vercel-Funktionen; Dateien mit `_` sind geteilter Code, 
 
 Die Seite (`src/`). Im Browser läuft ein Skript, das der Build aus diesen Dateien zusammensetzt:
 
-- `render.js`: baut aus Rapla-Daten das HTML (Kursplan, Kalenderdatei, Mensa), beim Build und im Browser.
+- `render.js`: baut aus Rapla-Daten das HTML (Kursplan, Freistunden, Kalenderdatei, Mensa), beim Build und im Browser.
 - `app.js`: welche Ansicht zu sehen ist, Kurse laden und aktuell halten. Richtet die anderen ein:
 - `timetable.js`: der Plan auf dem Bildschirm (Wochen, Modulfilter, „läuft gerade“).
-- `search.js`: die Kurssuche. `mensa.js`: die Mensa-Karte. `pwa.js`: Installieren und Offline. `chat.js`: der Chat. `settings.js`: die Einstellungen. `account.js`: Konten und Notizen.
+- `search.js`: die Kurssuche. `mensa.js`: die Mensa-Karte. `pwa.js`: Installieren und Offline. `match.js`: der Freistunden-Matcher. `chat.js`: der Chat. `settings.js`: die Einstellungen. `account.js`: Konten und Notizen.
 - `theme.js`: setzt Hell/Dunkel und Akzent vor dem ersten Bild (eigenes Skript im `<head>`, nicht Teil des Seitenskripts).
 - `sw.js`: der Service Worker (eigene Datei, nicht Teil des Skripts).
 - `styles.css`: Aussehen.

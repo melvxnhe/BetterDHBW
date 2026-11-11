@@ -6,7 +6,7 @@ Stundenpläne aller Kurse der DHBW Mannheim aus Rapla (über api.dhbw.app), mit 
 
 | Befehl | Wann |
 | --- | --- |
-| `npm test` | nach jeder Änderung an `api/`, `serve.mjs` oder Konten/Chat/Admin. 42 End-to-End-Tests, ca. 6 s, eigener Server mit In-Memory-Datenbank, kein Netz nötig |
+| `npm test` | nach jeder Änderung an `api/`, `serve.mjs`, Konten/Chat/Admin oder der Freistunden-Logik in `render.js`. 42 End-to-End-Tests (eigener Server mit In-Memory-Datenbank) plus 9 Unit-Tests (`tests/match.test.mjs`), ca. 6 s, kein Netz nötig |
 | `npm run build:offline` | nach jeder Änderung in `src/`: baut aus `data/*.json` und bricht ab, wenn das zusammengesetzte Seitenskript nicht parst |
 | `npm start` | bauen (mit Netz) und Server auf http://localhost:8137 |
 | Vorschau | `.claude/launch.json`: `timetable` (Port 8137), `timetable-test` (Port 8138). `dev.html` hat Worst-Case-Daten zum Umschalten |
@@ -15,7 +15,7 @@ Stundenpläne aller Kurse der DHBW Mannheim aus Rapla (über api.dhbw.app), mit 
 
 ## Wie der Code zusammenhängt
 
-- **Browser-Skript = ein Scope.** `build.mjs` hängt `render.js, timetable.js, search.js, mensa.js, pwa.js, chat.js, settings.js, account.js, app.js` (in dieser Reihenfolge) zu einem Skript zusammen und entfernt `export `. Folgen:
+- **Browser-Skript = ein Scope.** `build.mjs` hängt `render.js, timetable.js, search.js, mensa.js, pwa.js, match.js, chat.js, settings.js, account.js, app.js` (in dieser Reihenfolge) zu einem Skript zusammen und entfernt `export `. Folgen:
   - Keine `import`s zwischen diesen Dateien; alles Top-Level teilt sich einen Namensraum (Namen nur einmal vergeben).
   - Jede Datei außer `render.js` definiert genau eine `setupX(...)`-Funktion; `app.js` (zuletzt) ruft sie auf. Neues Browser-Feature: eigene Datei mit `setupX`, in `SCRIPTS` in `build.mjs` eintragen, in `app.js` einrichten.
   - `render.js` läuft im Build (Node) **und** im Browser: keine Node-APIs, keine DOM-Abhängigkeit beim Laden.
@@ -23,6 +23,7 @@ Stundenpläne aller Kurse der DHBW Mannheim aus Rapla (über api.dhbw.app), mit 
   - Ausnahme `theme.js`: läuft als eigenes Skript im `<head>` (Theme vor dem ersten Bild). Seine Funktionen (`readTheme`, `applyTheme`, `THEME_*`) sind global und werden von `settings.js` benutzt.
 - **CSP mit Hashes:** `src/page.js` hasht jedes eingebettete `<script>`/`<style>` (ohne Attribute, sonst greift der Hash nicht). Keine `on…=`-Attribute (werden blockiert); Logik gehört ins Seitenskript, nur `theme.js` steht wegen des ersten Bildes im `<head>`. `style="…"`-Attribute sind erlaubt (für CSS-Variablen wie `--cols`).
 - **Server: ein Kern, zwei Adapter.** Die Logik steckt in `api/_*.js` (Unterstrich = geteilter Code). `api/<name>.js` macht daraus per `vercel()` eine Vercel-Funktion, `serve.mjs` ruft dieselben Handler lokal auf. Neue API: Routen mit `api(name, methods, routes)` aus `_http.js`, Adapter in `api/`, Rewrite in `vercel.json` **und** Eintrag in `APIS` in `serve.mjs`.
+- **Ansichten:** `body[data-view]` ist `home`, `course`, `match` (Freistunden, `?frei=A,B`) oder `account` (`?konto=…`). `app.js` wechselt sie mit `swap()`; danach baut `start()` (`timetable.js`) Wochen-Tabs und „heute“ für alles, was `tabsHTML()`-Tabs und `.day[data-date]` hat, auch im Matcher.
 - **Proxy zu api.dhbw.app:** nur `api/_dhbw.js` entscheidet, welcher Pfad was abruft.
 - **Datenbank:** `api/_db.js`. Schemaänderung = neues `CREATE TABLE/ALTER … IF NOT EXISTS` in `SCHEMA`. `migrate()` prüft nur, ob die Tabelle `LAST` existiert: neue Tabelle ans Ende und `LAST` darauf setzen, sonst läuft die Migration auf bestehenden Datenbanken nicht. Lokal ohne `DATABASE_URL`: PGlite in `.data/`.
 

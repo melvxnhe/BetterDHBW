@@ -104,7 +104,7 @@ export function homeHTML(courses, { sample, sampleEvents = [], now = Date.now() 
 <button class="button search-go" type="button" data-search-go>Plan öffnen</button>
 <ul id="hero-list" class="search-list" role="listbox" aria-label="Kurse" hidden></ul>
 </div>
-<p class="hero-links"><a href="#kurse">Alle Kurse</a><a href="#so-gehts">So funktioniert’s</a><button class="link-button" type="button" data-install hidden>Als App installieren</button><span class="hero-recent" data-recent hidden></span></p>
+<p class="hero-links"><a href="#kurse">Alle Kurse</a><a href="?frei=" data-match-link="">Freistunden finden</a><a href="#so-gehts">So funktioniert’s</a><button class="link-button" type="button" data-install hidden>Als App installieren</button><span class="hero-recent" data-recent hidden></span></p>
 </div>
 </div>
 ${preview ? `<div class="hero-stage" data-ui>${preview}</div>` : ''}
