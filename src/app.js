@@ -24,7 +24,7 @@
 
   let view = null;    // the plan mounted by timetable.js
   let current = null; // the course on screen; null on the homepage and the account pages
-  let shown = null;   // { name, sig, due }: that course, what Rapla said last, and when to ask again
+  let shown = null;   // { name, sig, events, due }: that course, what Rapla said last, and when to ask again
   let loadToken = 0;  // counts navigations, so a slow answer can tell it is no longer wanted
   let icsUrl = null;
   let account = null; // the hooks from setupAccounts (account.js)
@@ -189,10 +189,10 @@
       // the address changes first, so the new plan doesn't pick up the old course's week anchor
       address();
       swap({ view: 'course', name: course.name, title: `${course.name} Stundenplan`, animate,
-        main: mainHTML(events, { course: course.name, full: course.full, now }), foot: footerHTML(events, { course: course.name, fetchedAt: saved || now }) });
+        main: courseHTML(events, { course: course.name, full: course.full, now }), foot: footerHTML(events, { course: course.name, fetchedAt: saved || now }) });
       setIcs(course.name, events);
       setOffline(saved);
-      shown = { name: course.name, sig: JSON.stringify(events), due: now + (saved ? RETRY : REFRESH) };
+      shown = { name: course.name, sig: JSON.stringify(events), events, due: now + (saved ? RETRY : REFRESH) };
       remember(course.name);
       account?.courseShown(course.name);
       return true;
@@ -229,20 +229,32 @@
       const sig = JSON.stringify(events);
       if (sig === mine.sig) { setOffline(saved); return; }
       mine.sig = sig;
-      const keep = view?.filterId || 'all', y = scrollY;
-      document.querySelector('main').innerHTML = mainHTML(events, { course: mine.name, full: byName.get(mine.name).full, now });
-      start();
-      view.filter(keep);
-      mensa.render();
+      mine.events = events;
+      redraw(now);
       setOffline(saved);
-      account?.decorate();
-      scrollTo({ top: y, behavior: 'instant' });
     } catch {
       mine.due = Date.now() + RETRY; // offline or API down
     } finally {
       refreshing = false;
     }
   }
+
+  // Draws the open course again in place: same week, same filter, same
+  // scroll position. After new data from Rapla, and when the layout changes
+  // (each layout has a course page of its own, views.js).
+  function redraw(now = Date.now()) {
+    if (!shown) return;
+    const keep = view?.filterId || 'all', y = scrollY;
+    document.querySelector('main').innerHTML = courseHTML(shown.events, { course: shown.name, full: byName.get(shown.name).full, now });
+    start();
+    view.filter(keep);
+    mensa.render();
+    account?.decorate();
+    layouts.page();
+    scrollTo({ top: y, behavior: 'instant' });
+  }
+
+  addEventListener('layoutchange', () => redraw());
 
   // ---------- the preview on the homepage ----------
 

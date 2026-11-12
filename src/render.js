@@ -195,12 +195,12 @@ function sessionHTML(e, heading = 'h4', place = null) {
   const [from, to] = spanParts(e.start, e.end);
   const meta = [e.room, hours(e.hours)].filter(Boolean).join(' · ');
   const style = place ? ` style="--s: ${+place.s.toFixed(3)}; --e: ${+place.e.toFixed(3)}; --lane: ${place.lane}; --lanes: ${place.lanes}"` : '';
-  return `<article class="session" data-id="${esc(String(e.id ?? ''))}" data-module="${e.module}" data-start="${e.start}" data-end="${e.end}" data-room="${esc(e.room)}" title="${esc(e.name)}"${style}>
-${e.exam ? `<span class="session-tag">${esc(e.exam)}</span>` : ''}<p class="session-time"><time datetime="${new Date(e.start).toISOString()}">${from}</time>${to ? ` – <time datetime="${new Date(e.end).toISOString()}">${to}</time>` : ''}</p>
-<${heading} class="session-title">${title(e.name)}</${heading}>
-<p class="session-meta">${esc(meta)}</p>
-<p class="session-status"></p>
-<div class="progress" aria-hidden="true"><i></i></div>
+  return `<article class="session" data-ev data-id="${esc(String(e.id ?? ''))}" data-module="${e.module}" data-start="${e.start}" data-end="${e.end}" data-room="${esc(e.room)}" title="${esc(e.name)}"${style}>
+${e.exam ? `<span class="session-tag">${esc(e.exam)}</span>` : ''}<p class="session-time" data-time><time datetime="${new Date(e.start).toISOString()}">${from}</time>${to ? ` – <time datetime="${new Date(e.end).toISOString()}">${to}</time>` : ''}</p>
+<${heading} class="session-title" data-title>${title(e.name)}</${heading}>
+<p class="session-meta" data-meta>${esc(meta)}</p>
+<p class="session-status" data-status></p>
+<div class="progress" aria-hidden="true"><i data-progress></i></div>
 </article>`;
 }
 
@@ -213,7 +213,7 @@ function weekHTML(w) {
   const days = w.days.map((d) => {
     const timed = d.events.filter((e) => d.layout.has(e));
     return `<section class="day" data-date="${d.key}" aria-labelledby="d${d.key}">
-<h3 class="day-head" id="d${d.key}"><span class="day-name">${d.weekday}</span> <span class="day-date">${d.day}. ${MON_SHORT[d.month - 1]}</span> <span class="today-pill">Heute</span></h3>
+<h3 class="day-head" id="d${d.key}"><span class="day-name" data-dayname>${d.weekday}</span> <span class="day-date">${d.day}. ${MON_SHORT[d.month - 1]}</span> <span class="today-pill">Heute</span></h3>
 <div class="day-items">${timed.length ? timed.map((e) => sessionHTML(e, 'h4', d.layout.get(e))).join('\n') : '<p class="day-empty">Keine Termine</p>'}</div>
 </section>`;
   }).join('\n');
@@ -236,12 +236,12 @@ ${days}
 
 function examHTML(e) {
   const s = partsOf(e.start);
-  return `<li class="exam" data-start="${e.start}" data-end="${e.end}">
+  return `<li class="exam" data-exam data-start="${e.start}" data-end="${e.end}">
 <p class="exam-date" aria-hidden="true"><span class="exam-day">${s.day}</span><span class="exam-month">${MON_SHORT[s.month - 1]}</span></p>
 <div class="exam-body">
 <h3 class="exam-name">${title(e.name)}</h3>
 <p class="exam-meta">${weekdayOf(s)}, ${longDate(s)} · ${fromTo(e)}${e.room ? ' · ' + esc(e.room) : ''}</p>
-<p class="exam-countdown"></p>
+<p class="exam-countdown" data-countdown></p>
 </div>
 </li>`;
 }
@@ -259,12 +259,12 @@ function nowCardHTML(block, now, heading = 'h2') {
   const next = block.find((e) => e.end > now);
   const day = next && partsOf(next.start);
   const meta = next ? [`${weekdayOf(day)}, ${longDate(day)}`, fromTo(next), next.room].filter(Boolean).join(' · ') : '';
-  return `<section class="now" aria-label="Aktueller Termin" aria-live="polite">
-<p class="now-label"><span class="now-pulse" aria-hidden="true"></span><span class="now-label-text">${next ? 'Als Nächstes' : 'Keine Termine'}</span></p>
-<${heading} class="now-title">${next ? title(next.name) : 'In Rapla sind für diesen Kurs keine kommenden Termine eingetragen.'}</${heading}>
-<p class="now-meta">${esc(meta)}</p>
-<p class="now-rel"></p>
-<div class="progress" hidden><i></i></div>
+  return `<section class="now" data-now aria-label="Aktueller Termin" aria-live="polite">
+<p class="now-label"><span class="now-pulse" aria-hidden="true"></span><span class="now-label-text" data-now-label>${next ? 'Als Nächstes' : 'Keine Termine'}</span></p>
+<${heading} class="now-title" data-now-title>${next ? title(next.name) : 'In Rapla sind für diesen Kurs keine kommenden Termine eingetragen.'}</${heading}>
+<p class="now-meta" data-now-meta>${esc(meta)}</p>
+<p class="now-rel" data-now-rel></p>
+<div class="progress" data-now-bar hidden><i data-progress></i></div>
 </section>`;
 }
 
@@ -290,10 +290,10 @@ function tabsHTML(weeks, now) {
   const tab = (w, copy) => copy
     ? `<span class="tab"><span class="tab-kw">KW ${w.kw}</span><span class="tab-range">${w.range}</span></span>`
     : `<a class="tab${w.end <= now ? ' is-past' : ''}" role="tab" id="tab-${w.id}" href="#${w.id}" aria-controls="${w.id}" aria-selected="false"><span class="tab-kw">KW ${w.kw}</span><span class="tab-range">${w.range}</span></a>`;
-  return `<nav class="scroller tabs-scroll" aria-label="Wochen">
+  return `<nav class="scroller tabs-scroll" data-tabs-scroll aria-label="Wochen">
 <div class="tabs-track">
 <div class="tabs" role="tablist" aria-label="Woche wählen">${weeks.map((w) => tab(w)).join('')}</div>
-<div class="tabs tabs-active" aria-hidden="true">${weeks.map((w) => tab(w, true)).join('')}</div>
+<div class="tabs tabs-active" data-tabs-copy aria-hidden="true">${weeks.map((w) => tab(w, true)).join('')}</div>
 </div>
 </nav>`;
 }
@@ -646,7 +646,7 @@ export function previewHTML(course, events, now) {
 <p class="preview-head" id="preview-title"><b>${esc(course)}</b><span>so sieht ein Plan aus</span></p>
 ${nowCardHTML(block, now, 'h3')}
 <section class="day preview-day" data-date="${key}" aria-labelledby="pv${key}">
-<h3 class="day-head" id="pv${key}"><span class="day-name">${weekdayOf(p)}</span> <span class="day-date">${p.day}. ${MON_SHORT[p.month - 1]}</span> <span class="today-pill">Heute</span></h3>
+<h3 class="day-head" id="pv${key}"><span class="day-name" data-dayname>${weekdayOf(p)}</span> <span class="day-date">${p.day}. ${MON_SHORT[p.month - 1]}</span> <span class="today-pill">Heute</span></h3>
 <div class="day-items">${day.map((e) => sessionHTML(e, 'p')).join('\n')}</div>
 </section>
 <p class="preview-open"><a href="?kurs=${encodeURIComponent(course)}" data-course-link="${esc(course)}">Ganzen Plan von ${esc(course)} öffnen</a></p>

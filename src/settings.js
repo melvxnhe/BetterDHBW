@@ -17,9 +17,9 @@ function setupSettings() {
   // the layouts (src/layouts.css): each a look of its own for the whole site
   const LAYOUTS = [
     ['standard', 'Standard', 'Karten und Wochenraster, hell oder dunkel.'],
-    ['tafel', 'Abfahrtstafel', 'Der Plan als Anzeigetafel am Bahnhof: Zeilen, Bernstein auf Schwarz, Bahnhofsuhr.'],
+    ['tafel', 'Abfahrtstafel', 'Abfahrtstafeln am Bahnhof: Fallblatt-Zeiten, Module als Linien, Räume als Gleise.'],
     ['plakat', 'Plakat', 'Wie ein Schweizer Plakat: große Schrift, schwarze Linien, nur Schwarz, Weiß und Rot.'],
-    ['tageslicht', 'Tageslicht', 'Die Seite nimmt die Farbe der Tageszeit an, die Sonne zeigt, wo du gerade bist.'],
+    ['tageslicht', 'Tageslicht', 'Eine Sonnenuhr über deinem Tag, die Seite in der Farbe der Tageszeit.'],
   ];
 
   // Each swatch carries data-accent, so it shows that accent's colour with

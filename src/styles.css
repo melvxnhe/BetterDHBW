@@ -466,7 +466,7 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
   height: 100%;
   background: var(--accent);
   transform-origin: left center;
-  transform: scaleX(0);
+  transform: scaleX(var(--p, 0));
   /* constant progress: linear, never eased */
   transition: transform 1000ms linear;
 }
@@ -721,7 +721,7 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
   .days .day.has-now .day-items::after {
     content: "";
     position: absolute;
-    z-index: 2;
+    z-index: 0; /* under the cards: it shows in the gaps, the running card shows its own share */
     left: -4px;
     right: 0;
     top: calc((var(--now) - var(--lo)) * var(--hour));
@@ -750,12 +750,22 @@ main.is-loading { opacity: 0.45; pointer-events: none; }
   }
 
   .days .day-items .session-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; hyphens: auto; }
-  .days .day-items .session .progress { position: absolute; inset: auto 10px 7px 12px; margin: 0; }
+  /* The running lecture fills from its top down to now, so the fill's edge
+     continues the now-line through the card instead of a line over the text. */
+  .days .day-items .session { z-index: 1; }
+  .days .day-items .session .progress { position: absolute; z-index: -1; inset: 0; height: auto; margin: 0; border-radius: inherit; background: none; }
+  .days .day-items .session .progress i {
+    height: 100%;
+    background: var(--accent-soft);
+    box-shadow: inset 0 -2px 0 var(--accent); /* taste-skill-ignore: the now edge inside the fill */
+    transform-origin: top center;
+    transform: translateY(calc((var(--p, 0) - 1) * 100%));
+  }
   .days .day-items .session-note { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
 
   /* what still fits as a block gets shorter: the title first, then only the time */
   @container (max-height: 110px) {
-    .session-meta, .session-note, .session .progress { display: none !important; }
+    .session-meta, .session-note { display: none !important; }
     .session-title { -webkit-line-clamp: 2; }
   }
   @container (max-height: 74px) {

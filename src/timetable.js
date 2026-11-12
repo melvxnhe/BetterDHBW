@@ -43,28 +43,38 @@ function setupTimetable() {
   // Progress bars glide linearly from one minute to the next, but their first
   // value appears as is: a sweep from empty on every load or redraw would be
   // motion nobody asked for, and would suggest the lecture just started.
+  // The share goes into --p; each layout's CSS decides how a share looks
+  // (a bar growing to the right, a card filling from the top, an arc).
   function setProgress(bar, share) {
-    const value = `scaleX(${Math.min(1, Math.max(0, share)).toFixed(4)})`;
-    if (bar.dataset.ready) { bar.style.transform = value; return; }
+    if (!bar) return;
+    const value = Math.min(1, Math.max(0, share)).toFixed(4);
+    if (bar.dataset.ready) { bar.style.setProperty('--p', value); return; }
     bar.style.transition = 'none';
-    bar.style.transform = value;
+    bar.style.setProperty('--p', value);
     bar.getBoundingClientRect(); // commit the value before the transition returns
     bar.style.transition = '';
     bar.dataset.ready = '1';
   }
 
+  // Every layout's markup carries the same hooks, whatever its classes:
+  // [data-ev] an entry (data-start, data-end, data-module) with [data-status],
+  // [data-progress] and [data-title] inside; [data-date] a day; [data-exam]
+  // with [data-countdown]; [data-now] the card for now or next; [data-filter]
+  // the module chips; a [role=tablist] of week tabs, [data-tabs-copy] the
+  // clipped copy under them, [data-tabs-scroll] their scroller.
   return function mount(root) {
     const main = root.querySelector('main');
     const bar = root.querySelector('.bar');
-    const sessions = [...main.querySelectorAll('.session')];
-    const days = [...main.querySelectorAll('.day')];
-    const exams = [...main.querySelectorAll('.exam')];
-    const chips = [...main.querySelectorAll('.chip')];
-    const tabs = [...main.querySelectorAll('.tabs [role="tab"]')];
-    const copy = main.querySelector('.tabs-active');
-    const scroller = main.querySelector('.tabs-scroll');
+    const sessions = [...main.querySelectorAll('[data-ev]')];
+    const days = [...main.querySelectorAll('[data-date]')];
+    const exams = [...main.querySelectorAll('[data-exam]')];
+    const chips = [...main.querySelectorAll('[data-filter]')];
+    const tablist = main.querySelector('[role="tablist"]');
+    const tabs = tablist ? [...tablist.querySelectorAll('[role="tab"]')] : [];
+    const copy = main.querySelector('[data-tabs-copy]');
+    const scroller = main.querySelector('[data-tabs-scroll]');
     const panels = tabs.map((t) => main.querySelector('#' + t.getAttribute('aria-controls')));
-    const now = main.querySelector('.now');
+    const now = main.querySelector('[data-now]');
     const span = (el) => [+el.dataset.start, +el.dataset.end];
     // the week of today, else the next one, else the last
     const currentWeek = (ms) => { const i = panels.findIndex((p) => ms < span(p)[1]); return i < 0 ? panels.length - 1 : i; };
@@ -124,7 +134,7 @@ function setupTimetable() {
       select(i, { animate: e.detail !== 0 });
     }));
 
-    main.querySelector('.tabs')?.addEventListener('keydown', (e) => {
+    tablist?.addEventListener('keydown', (e) => {
       const keys = { ArrowRight: active + 1, ArrowLeft: active - 1, Home: 0, End: tabs.length - 1 };
       if (!(e.key in keys)) return;
       e.preventDefault();
@@ -143,7 +153,7 @@ function setupTimetable() {
       chips.forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.filter === id)));
       sessions.forEach((s) => s.classList.toggle('is-dimmed', id !== 'all' && s.dataset.module !== id));
       panels.forEach((p, j) => tabs[j].classList.toggle('is-empty',
-        id !== 'all' && !p.querySelector(`.session[data-module="${id}"]`)));
+        id !== 'all' && !p.querySelector(`[data-ev][data-module="${id}"]`)));
     }
 
     chips.forEach((c) => c.addEventListener('click', () => {
@@ -178,18 +188,22 @@ function setupTimetable() {
         const [a, b] = span(s);
         s.classList.toggle('is-past', b <= ms);
         s.classList.remove('is-live', 'is-next');
+        const status = s.querySelector('[data-status]');
+        if (status?.textContent) status.textContent = ''; // a layout may show it always, so no stale text from a minute ago
         if (a <= ms && ms < b) running.push(s);
         if (a > ms && !next) next = s;
       }
       running.forEach((s) => {
         const [a, b] = span(s);
         s.classList.add('is-live');
-        s.querySelector('.session-status').textContent = `Läuft · noch ${remaining(b, ms)}`;
-        setProgress(s.querySelector('.progress i'), (ms - a) / (b - a));
+        const status = s.querySelector('[data-status]');
+        if (status) status.textContent = `Läuft · noch ${remaining(b, ms)}`;
+        setProgress(s.querySelector('[data-progress]'), (ms - a) / (b - a));
       });
       if (next) {
         next.classList.add('is-next');
-        next.querySelector('.session-status').textContent = `Als Nächstes · ${until(+next.dataset.start, t)}`;
+        const status = next.querySelector('[data-status]');
+        if (status) status.textContent = `Als Nächstes · ${until(+next.dataset.start, t)}`;
       }
       return { running, next };
     }
@@ -203,8 +217,8 @@ function setupTimetable() {
       days.forEach((d) => {
         const isToday = d.dataset.date === today;
         d.classList.toggle('is-today', isToday);
-        // the now-line, only within the hours the week's grid shows (--lo/--hi on the week)
-        const week = d.closest('.week');
+        // the now-line, only within the hours the week shows (--lo/--hi on its panel; a layout without a time axis has none)
+        const week = d.closest('[role="tabpanel"]');
         const lo = +week?.style.getPropertyValue('--lo'), hi = +week?.style.getPropertyValue('--hi');
         const inGrid = isToday && !!week && hour >= lo && hour <= hi;
         d.classList.toggle('has-now', inGrid);
@@ -229,7 +243,8 @@ function setupTimetable() {
       exams.forEach((x) => {
         const [a, b] = span(x);
         x.classList.toggle('is-past', b <= +t);
-        x.querySelector('.exam-countdown').textContent = examCountdown(a, b, t);
+        const out = x.querySelector('[data-countdown]');
+        if (out) out.textContent = examCountdown(a, b, t);
       });
     }
 
@@ -238,11 +253,11 @@ function setupTimetable() {
       // of several at once, the one that ends first: the lecture, not the project week around it
       const live = running.slice().sort((x, y) => span(x)[1] - span(y)[1])[0] || null;
       const pick = live || next;
-      const label = now.querySelector('.now-label-text');
-      const title = now.querySelector('.now-title');
-      const meta = now.querySelector('.now-meta');
-      const rel = now.querySelector('.now-rel');
-      const progress = now.querySelector('.progress');
+      const label = now.querySelector('[data-now-label]');
+      const title = now.querySelector('[data-now-title]');
+      const meta = now.querySelector('[data-now-meta]');
+      const rel = now.querySelector('[data-now-rel]');
+      const progress = now.querySelector('[data-now-bar]');
       now.classList.toggle('is-live', !!live);
       progress.hidden = !live;
       if (!pick) {
@@ -254,12 +269,14 @@ function setupTimetable() {
       }
       const [a, b] = span(pick);
       const room = pick.dataset.room;
-      title.textContent = pick.querySelector('.session-title').textContent;
+      title.textContent = pick.querySelector('[data-title]').textContent;
+      // the share of the running entry, also on the card itself (layouts draw it as they like)
+      now.style.setProperty('--p', live ? Math.min(1, Math.max(0, (+t - a) / (b - a))).toFixed(4) : '0');
       if (live) {
         label.textContent = running.length > 1 ? `Läuft gerade · ${running.length} Termine parallel` : 'Läuft gerade';
         meta.textContent = [fromTo(a, b), room].filter(Boolean).join(' · ');
         rel.textContent = `Noch ${remaining(b, +t)}`;
-        setProgress(progress.querySelector('i'), (+t - a) / (b - a));
+        setProgress(progress.querySelector('[data-progress]'), (+t - a) / (b - a));
       } else {
         label.textContent = 'Als Nächstes';
         meta.textContent = [fDayLong.format(a), fromTo(a, b), room].filter(Boolean).join(' · ');

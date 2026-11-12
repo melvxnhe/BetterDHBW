@@ -338,7 +338,7 @@ ${field('password', 'Neues Passwort', { type: 'password', autocomplete: 'new-pas
     const act = e.target.closest('[data-account-action]');
     if (act) { ACTIONS[act.dataset.accountAction]?.(); return; }
     const note = e.target.closest('[data-note]');
-    if (note) openNote(note.closest('.session'));
+    if (note) openNote(note.closest('[data-ev]'));
   });
 
   // ---------- notes on the timetable ----------
@@ -360,7 +360,7 @@ ${field('password', 'Neues Passwort', { type: 'password', autocomplete: 'new-pas
   // A "Notiz" button on every lecture, and the note itself under it.
   function decorate() {
     const on = !!state.user && state.notesCourse === app.getCurrent();
-    document.querySelectorAll('main .session[data-id]').forEach((s) => {
+    document.querySelectorAll('main [data-ev][data-id]').forEach((s) => {
       let button = s.querySelector('[data-note]');
       let text = s.querySelector('.session-note');
       if (!on || !s.dataset.id) { button?.remove(); text?.remove(); return; }
@@ -368,10 +368,12 @@ ${field('password', 'Neues Passwort', { type: 'password', autocomplete: 'new-pas
       if (!button) {
         button = Object.assign(document.createElement('button'), { type: 'button', className: 'note-button' });
         button.dataset.note = '';
-        s.querySelector('.session-meta').after(button);
+        // where the layout wants it: its [data-note-slot], else after the room line, else at the end
+        const slot = s.querySelector('[data-note-slot]'), meta = s.querySelector('[data-meta]');
+        if (slot) slot.append(button); else if (meta) meta.after(button); else s.append(button);
       }
       button.textContent = note ? 'Notiz bearbeiten' : 'Notiz';
-      button.setAttribute('aria-label', `${note ? 'Notiz bearbeiten' : 'Notiz schreiben'}: ${s.querySelector('.session-title').textContent}`);
+      button.setAttribute('aria-label', `${note ? 'Notiz bearbeiten' : 'Notiz schreiben'}: ${s.querySelector('[data-title]').textContent}`);
       if (note) {
         if (!text) { text = Object.assign(document.createElement('p'), { className: 'session-note', dir: 'auto' }); button.before(text); }
         text.textContent = note.body; // as text, never as HTML
@@ -413,9 +415,9 @@ ${field('password', 'Neues Passwort', { type: 'password', autocomplete: 'new-pas
     dialog ??= buildDialog();
     const id = session.dataset.id;
     const note = state.notes.get(id);
-    editing = { id, session, name: session.querySelector('.session-title').textContent, start: new Date(+session.dataset.start).toISOString() };
+    editing = { id, session, name: session.querySelector('[data-title]').textContent, start: new Date(+session.dataset.start).toISOString() };
     dialog.querySelector('[data-note-title]').textContent = editing.name;
-    dialog.querySelector('[data-note-when]').textContent = `${session.closest('.day')?.querySelector('.day-name')?.textContent || ''}, ${session.querySelector('.session-time')?.textContent || ''}`;
+    dialog.querySelector('[data-note-when]').textContent = `${session.closest('[data-date]')?.querySelector('[data-dayname]')?.textContent || ''}, ${session.querySelector('[data-time]')?.textContent || ''}`;
     dialog.querySelector('textarea').value = note?.body || '';
     dialog.querySelector('[data-note-delete]').hidden = !note;
     setMessage(dialog.querySelector('form'), '');

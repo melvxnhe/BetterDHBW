@@ -1,34 +1,29 @@
-// What a layout brings beyond its stylesheet (src/layouts.css): the
-// Abfahrtstafel's station clock in the header, and the Tageslicht sky that
-// follows the hour, with the sun on the course page's horizon. Which layout
-// is on is data-layout on <html> (theme.js); settings.js fires "layoutchange"
-// when it changes.
+// What a layout brings beyond its stylesheet (src/layouts.css) and its
+// course page (src/views.js): the Abfahrtstafel's clock over the boards, and
+// the Tageslicht sky that follows the hour, with a greeting and the sun on
+// the course page's dial. Which layout is on is data-layout on <html>
+// (theme.js); settings.js fires "layoutchange" when it changes.
 //
-// setupLayouts() returns { page }: page() is called after every view swap.
+// setupLayouts() returns { page }: page() is called after the course page
+// or any other view is drawn.
 function setupLayouts() {
   const layout = () => document.documentElement.dataset.layout || 'standard';
   const fClock = new Intl.DateTimeFormat('de-DE', { timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const fHour = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
   const hourOf = (t) => { const [h, m] = fHour.format(t).split(':').map(Number); return h + m / 60; };
 
-  // ---------- Abfahrtstafel: the station clock, ticking in the header ----------
+  // ---------- Abfahrtstafel: the clock over the boards, with seconds ----------
 
   let clockTimer = null;
 
   function clock() {
     clearInterval(clockTimer);
     clockTimer = null;
-    let el = document.querySelector('.bar-clock');
-    if (layout() !== 'tafel') { el?.remove(); return; }
-    if (!el) {
-      el = document.createElement('span');
-      el.className = 'bar-clock';
-      el.setAttribute('aria-hidden', 'true');
-      document.querySelector('.bar-actions')?.prepend(el);
-    }
+    const el = document.querySelector('[data-clock]');
+    if (!el || layout() !== 'tafel') return;
     const tick = () => { el.textContent = fClock.format(new Date()); };
     tick();
-    clockTimer = setInterval(() => { if (!document.hidden) tick(); }, 1000);
+    clockTimer = setInterval(() => { if (!document.hidden && el.isConnected) tick(); }, 1000);
   }
 
   // ---------- Tageslicht: the sky by the hour ----------
@@ -66,7 +61,6 @@ function setupLayouts() {
       ['--sky-top', '--sky-bottom', '--sun-x', '--sun-y'].forEach((v) => root.style.removeProperty(v));
       delete root.dataset.sky;
       delete root.dataset.skyBody;
-      strip();
       return;
     }
     const h = hourOf(Date.now());
@@ -78,25 +72,26 @@ function setupLayouts() {
     root.dataset.sky = s.ink;
     root.dataset.skyBody = a.body;
     document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => { meta.content = s.top; });
-    strip();
+    dial();
   }
 
-  // The horizon on the course page: the day from 6 to 22, the sun (or moon)
-  // where the time is now, today's lectures as marks on the ground.
-  function strip() {
-    document.querySelector('.sky-strip')?.remove();
+  // The course page's dial (views.js): the sun on its arc where the time is
+  // now, if the dial shows today and it is day; the greeting over the title.
+  const GREETINGS = [[5, 'Guten Morgen'], [11, 'Guten Tag'], [17, 'Guten Abend'], [22, 'Gute Nacht']];
+
+  function dial() {
     if (layout() !== 'tageslicht') return;
-    const intro = document.querySelector('main .intro');
-    if (!intro) return;
-    const along = (t) => `${(Math.max(0, Math.min(1, (hourOf(t) - 6) / 16)) * 100).toFixed(2)}%`;
-    const ticks = [...document.querySelectorAll('.day.is-today .session[data-start]')].map((s) =>
-      `<i class="sky-tick" style="--a: ${along(+s.dataset.start)}; --b: ${along(+s.dataset.end)}"></i>`).join('');
-    const hours = [[6, 0], [12, 37.5], [18, 75], [22, 100]].map(([h, x]) => `<span class="sky-hour" style="--x: ${x}%">${h}</span>`).join('');
-    const el = document.createElement('div');
-    el.className = 'sky-strip';
-    el.setAttribute('aria-hidden', 'true');
-    el.innerHTML = `${hours}<i class="sky-body"></i>${ticks}`;
-    intro.append(el);
+    const h = hourOf(Date.now());
+    const greet = document.querySelector('[data-greeting]');
+    if (greet) greet.textContent = (GREETINGS.findLast(([from]) => h >= from) || GREETINGS.at(-1))[1];
+    const sun = document.querySelector('[data-sun]');
+    if (!sun) return;
+    const today = sun.closest('[data-dial]')?.dataset.dial === keyOf(partsOf(Date.now()));
+    if (!today || h < 6 || h >= 22) { sun.setAttribute('hidden', ''); return; }
+    const t = (h - 6) / 16; // same circle as the arc in views.js: centre 200/200, radius 180
+    sun.setAttribute('cx', (200 - 180 * Math.cos(Math.PI * t)).toFixed(1));
+    sun.setAttribute('cy', (200 - 180 * Math.sin(Math.PI * t)).toFixed(1));
+    sun.removeAttribute('hidden');
   }
 
   addEventListener('layoutchange', () => { clock(); sky(); });
@@ -107,8 +102,8 @@ function setupLayouts() {
 
   return {
     page() {
-      if (layout() === 'tafel') clock(); // the header is the same element, but the bar's children may be redrawn
-      strip();
+      clock();
+      dial();
     },
   };
 }

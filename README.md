@@ -64,13 +64,13 @@ Unter `?frei=WWI26SEA,TINF25CS1`: zwei Kurse nebeneinander, Woche für Woche, un
 ## Einstellungen
 
 - Der Knopf rechts oben (Schieberegler) öffnet die Einstellungen: Darstellung „Automatisch“ (wie das Gerät), „Hell“ oder „Dunkel“, und eine Akzentfarbe (Rot, Blau, Grün, Lila, Orange) für heute, was gerade läuft und die Prüfungen. Fehler und Löschen bleiben rot.
-- Dazu das **Layout**, ein eigener Look für die ganze Seite auf denselben Inhalten:
-  - **Standard**: Karten und das Wochenraster, hell oder dunkel.
-  - **Abfahrtstafel**: der Plan als Anzeigetafel am Bahnhof. Jeder Tag eine Tafel mit Zeilen (Zeit · Vorlesung · Raum · Status: „planmäßig“, „läuft · noch 34 Min.“, „abgefahren“), Bernstein auf Schwarz, eine tickende Bahnhofsuhr im Kopf.
-  - **Plakat**: wie ein Schweizer Plakat. Riesige Schrift in Versalien, schwarze Linien, eckig, nur Schwarz, Weiß und Rot; Module sind am Namen zu erkennen, nicht an der Farbe. Hell ist das Plakat, dunkel sein Negativ.
-  - **Tageslicht**: die Seite nimmt die Farbe der echten Tageszeit an (Morgenblau, Mittag, Abendrot, Nacht) und wechselt jede Minute mit. Unter dem Kurstitel läuft ein Horizont von 6 bis 22 Uhr mit der Sonne (nachts dem Mond) dort, wo die Uhr gerade steht, und den heutigen Vorlesungen als Marken; im Wochenraster ist die Sonne die Jetzt-Linie.
+- Dazu das **Layout**. Jedes hat für den Kursplan einen eigenen Aufbau, nicht nur andere Farben; Startseite, Freistunden, Konto, Chat und Einstellungen bekommen seine Farben und Formen:
+  - **Standard**: Karten und das Wochenraster, hell oder dunkel. Die laufende Vorlesung füllt sich von oben bis zur Jetzt-Linie.
+  - **Abfahrtstafel**: der Plan als Abfahrtstafeln am Bahnhof, nachtblau mit Gelb. Oben die Uhr mit Sekunden und eine Laufschrift (Theoriephase, Raum, nächste Prüfung). Jeder Tag eine Tafel: Zeit als Fallblatt-Ziffern, das Modul als Linie (S1, S2 …), die Vorlesung als Ziel, der Raum als Gleis, dazu „planmäßig“, „Läuft · noch 34 Min.“ oder „abgefahren“. Die laufende Zeile füllt sich gelb bis jetzt. Prüfungen sind „Sonderfahrten“.
+  - **Plakat**: wie ein Schweizer Plakat. Der Kursname riesig über die ganze Breite, die Kalenderwoche als roter Kreis, Wochen als große Ziffern, jeder Tag eine Zeile mit „MO“, „DI“ … in Plakatgröße, die Module als Register mit Punktlinien, Prüfungen mit „In 27 Tagen“ in Rot. Nur Schwarz, Weiß und Rot, eckig; hell ist das Plakat, dunkel sein Negativ.
+  - **Tageslicht**: die Seite nimmt die Farbe der echten Tageszeit an und wechselt jede Minute mit. Oben eine Sonnenuhr: ein Bogen von 6 bis 22 Uhr mit den Vorlesungen des Tages als Bögen, die Sonne steht, wo die Uhr steht, in der Mitte die laufende oder nächste Vorlesung. Darunter jeder Tag als Himmelsband von Morgengrauen bis Nacht mit den Vorlesungen dort, wo sie liegen; die laufende füllt sich mit Sonnenlicht. Auf dem Handy werden die Bänder zu einer Liste.
 - Gespeichert auf dem Gerät (localStorage), nicht im Konto: Handy und Laptop können verschieden aussehen. Andere offene Tabs ziehen sofort nach. `?layout=tafel` (oder `plakat`, `tageslicht`, `standard`) zeigt ein Layout für diesen Aufruf, ohne es zu speichern, zum Ausprobieren oder Herzeigen.
-- Die Layouts stehen in `src/layouts.css` (nach `styles.css` eingebettet, je ein Block pro `data-layout`), was sie an Skript brauchen (Uhr, Himmel, Horizont) in `src/layouts.js`.
+- Der Kursplan jedes Layouts ist eigenes Markup aus `src/views.js` (`courseHTML()` wählt nach dem Layout, beim Wechsel wird der Plan neu gezeichnet). Die Stile stehen in `src/layouts.css` (nach `styles.css` eingebettet), was sie an Skript brauchen (Uhr, Himmel, Sonne) in `src/layouts.js`.
 - `src/theme.js` setzt die Wahl schon im `<head>` (vor dem ersten Bild, also kein weißes Aufblitzen im Dunkelmodus); `src/settings.js` ist der Knopf mit dem Fenster. Die Farben stehen in `styles.css` als `light-dark()`-Paare, die Akzente unter `[data-accent]`.
 - Der Adminbereich folgt der Einstellung nicht, nur dem Gerät.
 
@@ -160,13 +160,13 @@ Der Server (`api/`, als Vercel-Funktionen; Dateien mit `_` sind geteilter Code, 
 
 Die Seite (`src/`). Im Browser läuft ein Skript, das der Build aus diesen Dateien zusammensetzt:
 
-- `render.js`: baut aus Rapla-Daten das HTML (Kursplan, Freistunden, Kalenderdatei, Mensa), beim Build und im Browser.
+- `render.js`: baut aus Rapla-Daten das HTML (Kursplan, Freistunden, Kalenderdatei, Mensa), beim Build und im Browser. `views.js`: der Kursplan in den anderen Layouts (nur im Browser).
 - `app.js`: welche Ansicht zu sehen ist, Kurse laden und aktuell halten. Richtet die anderen ein:
 - `timetable.js`: der Plan auf dem Bildschirm (Wochen, Modulfilter, „läuft gerade“).
-- `search.js`: die Kurssuche. `mensa.js`: die Mensa-Karte. `pwa.js`: Installieren und Offline. `match.js`: der Freistunden-Matcher. `chat.js`: der Chat. `settings.js`: die Einstellungen. `layouts.js`: Bahnhofsuhr und Himmel der anderen Layouts. `account.js`: Konten und Notizen.
+- `search.js`: die Kurssuche. `mensa.js`: die Mensa-Karte. `pwa.js`: Installieren und Offline. `match.js`: der Freistunden-Matcher. `chat.js`: der Chat. `settings.js`: die Einstellungen. `layouts.js`: Uhr, Himmel und Sonne der anderen Layouts. `account.js`: Konten und Notizen.
 - `theme.js`: setzt Hell/Dunkel und Akzent vor dem ersten Bild (eigenes Skript im `<head>`, nicht Teil des Seitenskripts).
 - `sw.js`: der Service Worker (eigene Datei, nicht Teil des Skripts).
-- `styles.css`: Aussehen (Standard). `layouts.css`: die Layouts Abfahrtstafel, Plakat und Tageslicht darüber.
+- `styles.css`: Aussehen (Standard). `layouts.css`: die Layouts Abfahrtstafel, Plakat und Tageslicht darüber, mit ihren Kursplänen.
 
 Nur für den Build:
 
