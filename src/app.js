@@ -3,7 +3,8 @@
 // with the clock and with Rapla. The parts live in their own files and are
 // set up here: timetable.js (a plan's live state), search.js, mensa.js,
 // pwa.js (install and offline), match.js (Freistunden), chat.js,
-// settings.js (the theme), account.js. render.js makes the markup.
+// settings.js (the theme), layouts.js (what the other layouts bring),
+// account.js. render.js makes the markup.
 //
 // build.mjs joins these files into one script in the page; this one runs last.
 (() => {
@@ -300,6 +301,7 @@
   if (headerInput) combobox(headerInput, document.getElementById('course-list'));
 
   setupSettings();
+  const layouts = setupLayouts();
 
   const match = setupMatch({
     swap, start, fetchEvents, byName,
@@ -377,6 +379,7 @@
     mensa.load();
     pwa.showInstall();
     chat.rooms(); // the course on screen is one of the chat's rooms
+    layouts.page(); // the sky strip and the like, for the view on screen
 
     if (document.getElementById('hero-search')) setupHome();
   }

@@ -15,7 +15,7 @@ Stundenpläne aller Kurse der DHBW Mannheim aus Rapla (über api.dhbw.app), mit 
 
 ## Wie der Code zusammenhängt
 
-- **Browser-Skript = ein Scope.** `build.mjs` hängt `render.js, timetable.js, search.js, mensa.js, pwa.js, match.js, chat.js, settings.js, account.js, app.js` (in dieser Reihenfolge) zu einem Skript zusammen und entfernt `export `. Folgen:
+- **Browser-Skript = ein Scope.** `build.mjs` hängt `render.js, timetable.js, search.js, mensa.js, pwa.js, match.js, chat.js, settings.js, layouts.js, account.js, app.js` (in dieser Reihenfolge) zu einem Skript zusammen und entfernt `export `. Folgen:
   - Keine `import`s zwischen diesen Dateien; alles Top-Level teilt sich einen Namensraum (Namen nur einmal vergeben).
   - Jede Datei außer `render.js` definiert genau eine `setupX(...)`-Funktion; `app.js` (zuletzt) ruft sie auf. Neues Browser-Feature: eigene Datei mit `setupX`, in `SCRIPTS` in `build.mjs` eintragen, in `app.js` einrichten.
   - `render.js` läuft im Build (Node) **und** im Browser: keine Node-APIs, keine DOM-Abhängigkeit beim Laden.
@@ -28,6 +28,7 @@ Stundenpläne aller Kurse der DHBW Mannheim aus Rapla (über api.dhbw.app), mit 
 - **Proxy zu api.dhbw.app:** nur `api/_dhbw.js` entscheidet, welcher Pfad was abruft.
 - **Datenbank:** `api/_db.js`. Schemaänderung = neues `CREATE TABLE/ALTER … IF NOT EXISTS` in `SCHEMA`. `migrate()` prüft nur, ob die Tabelle `LAST` existiert: neue Tabelle ans Ende und `LAST` darauf setzen, sonst läuft die Migration auf bestehenden Datenbanken nicht. Lokal ohne `DATABASE_URL`: PGlite in `.data/`.
 
+- **Layouts:** `styles.css` ist der Standard; `layouts.css` (vom Build dahinter eingebettet) hält je einen Block unter `:root[data-layout="tafel"|"plakat"|"tageslicht"]`, der zuerst die Tokens (`--bg`, `--surface`, `--text`, `--accent`, `--m*`, `--radius`) und dann Formen und wenige Strukturen überschreibt; die Komponenten folgen den Tokens. Neues Markup für ein Layout nur per `layouts.js` (Uhr, Himmel, Horizont), nie in `render.js`. Ein neues Layout: Eintrag in `THEME_LAYOUTS` (`theme.js`), `LAYOUTS` (`settings.js`), ein CSS-Block; `data-layout` fehlt beim Standard. `settings.js` feuert `layoutchange`, `layouts.js` hört darauf. Die Regeln unter „Gestaltung“ gelten für den Standard; Abfahrtstafel und Plakat haben bewusst Versalien, Tageslicht bewusst Farbverlauf und Blur.
 - **Gestaltung:** eine Schrift (system-ui), Größen aus wenigen Stufen (0.75/0.8125/0.875/0.9375/1/1.125/1.25 rem und die Titel), Flächen durch Tonstufen statt Linien, kein Glas/Blur, Schatten nur auf Schwebendem (Menü, Dialog, Chat). Chrome ohne Farbe; Farbe liegt auf den Daten (Module, heute, „läuft gerade“) und Fehlern (`--danger`).
 - **Farben:** nur über die Tokens in `:root` (`styles.css`), jeder als `light-dark(hell, dunkel)`. Keine `prefers-color-scheme`-Regeln mehr: Hell/Dunkel stellt man in den Einstellungen um (`data-theme`), das würde eine Media-Query übergehen. `--accent` ist wählbar (`data-accent`); für Fehler und Löschen `--danger`.
 

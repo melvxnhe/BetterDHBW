@@ -64,7 +64,13 @@ Unter `?frei=WWI26SEA,TINF25CS1`: zwei Kurse nebeneinander, Woche für Woche, un
 ## Einstellungen
 
 - Der Knopf rechts oben (Schieberegler) öffnet die Einstellungen: Darstellung „Automatisch“ (wie das Gerät), „Hell“ oder „Dunkel“, und eine Akzentfarbe (Rot, Blau, Grün, Lila, Orange) für heute, was gerade läuft und die Prüfungen. Fehler und Löschen bleiben rot.
-- Gespeichert auf dem Gerät (localStorage), nicht im Konto: Handy und Laptop können verschieden aussehen. Andere offene Tabs ziehen sofort nach.
+- Dazu das **Layout**, ein eigener Look für die ganze Seite auf denselben Inhalten:
+  - **Standard**: Karten und das Wochenraster, hell oder dunkel.
+  - **Abfahrtstafel**: der Plan als Anzeigetafel am Bahnhof. Jeder Tag eine Tafel mit Zeilen (Zeit · Vorlesung · Raum · Status: „planmäßig“, „läuft · noch 34 Min.“, „abgefahren“), Bernstein auf Schwarz, eine tickende Bahnhofsuhr im Kopf.
+  - **Plakat**: wie ein Schweizer Plakat. Riesige Schrift in Versalien, schwarze Linien, eckig, nur Schwarz, Weiß und Rot; Module sind am Namen zu erkennen, nicht an der Farbe. Hell ist das Plakat, dunkel sein Negativ.
+  - **Tageslicht**: die Seite nimmt die Farbe der echten Tageszeit an (Morgenblau, Mittag, Abendrot, Nacht) und wechselt jede Minute mit. Unter dem Kurstitel läuft ein Horizont von 6 bis 22 Uhr mit der Sonne (nachts dem Mond) dort, wo die Uhr gerade steht, und den heutigen Vorlesungen als Marken; im Wochenraster ist die Sonne die Jetzt-Linie.
+- Gespeichert auf dem Gerät (localStorage), nicht im Konto: Handy und Laptop können verschieden aussehen. Andere offene Tabs ziehen sofort nach. `?layout=tafel` (oder `plakat`, `tageslicht`, `standard`) zeigt ein Layout für diesen Aufruf, ohne es zu speichern, zum Ausprobieren oder Herzeigen.
+- Die Layouts stehen in `src/layouts.css` (nach `styles.css` eingebettet, je ein Block pro `data-layout`), was sie an Skript brauchen (Uhr, Himmel, Horizont) in `src/layouts.js`.
 - `src/theme.js` setzt die Wahl schon im `<head>` (vor dem ersten Bild, also kein weißes Aufblitzen im Dunkelmodus); `src/settings.js` ist der Knopf mit dem Fenster. Die Farben stehen in `styles.css` als `light-dark()`-Paare, die Akzente unter `[data-accent]`.
 - Der Adminbereich folgt der Einstellung nicht, nur dem Gerät.
 
@@ -157,10 +163,10 @@ Die Seite (`src/`). Im Browser läuft ein Skript, das der Build aus diesen Datei
 - `render.js`: baut aus Rapla-Daten das HTML (Kursplan, Freistunden, Kalenderdatei, Mensa), beim Build und im Browser.
 - `app.js`: welche Ansicht zu sehen ist, Kurse laden und aktuell halten. Richtet die anderen ein:
 - `timetable.js`: der Plan auf dem Bildschirm (Wochen, Modulfilter, „läuft gerade“).
-- `search.js`: die Kurssuche. `mensa.js`: die Mensa-Karte. `pwa.js`: Installieren und Offline. `match.js`: der Freistunden-Matcher. `chat.js`: der Chat. `settings.js`: die Einstellungen. `account.js`: Konten und Notizen.
+- `search.js`: die Kurssuche. `mensa.js`: die Mensa-Karte. `pwa.js`: Installieren und Offline. `match.js`: der Freistunden-Matcher. `chat.js`: der Chat. `settings.js`: die Einstellungen. `layouts.js`: Bahnhofsuhr und Himmel der anderen Layouts. `account.js`: Konten und Notizen.
 - `theme.js`: setzt Hell/Dunkel und Akzent vor dem ersten Bild (eigenes Skript im `<head>`, nicht Teil des Seitenskripts).
 - `sw.js`: der Service Worker (eigene Datei, nicht Teil des Skripts).
-- `styles.css`: Aussehen.
+- `styles.css`: Aussehen (Standard). `layouts.css`: die Layouts Abfahrtstafel, Plakat und Tageslicht darüber.
 
 Nur für den Build:
 

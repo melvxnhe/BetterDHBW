@@ -46,8 +46,8 @@ test('weak passwords are refused: too short, the address itself, breached', asyn
   // judged when the service answers within the server's own timeout.
   // the same request the server will make (the range of this password), so a slow range is caught here, not there
   const range = createHash('sha1').update('password1234').digest('hex').toUpperCase().slice(0, 5);
-  const reachable = await fetch(`https://api.pwnedpasswords.com/range/${range}`, { headers: { 'Add-Padding': 'true', 'User-Agent': 'dhbw-mannheim-stundenplan' }, signal: AbortSignal.timeout(4000) }).then((r) => r.ok, () => false);
-  if (!reachable) { t.diagnostic('Have I Been Pwned not answering within 4 s: the breached-password check was not judged'); return; }
+  const reachable = await fetch(`https://api.pwnedpasswords.com/range/${range}`, { headers: { 'Add-Padding': 'true', 'User-Agent': 'dhbw-mannheim-stundenplan' }, signal: AbortSignal.timeout(2500) }).then((r) => r.ok, () => false);
+  if (!reachable) { t.diagnostic('Have I Been Pwned not answering within 2.5 s: the breached-password check was not judged'); return; }
   const breached = await alice.call('register', { email: EMAIL, password: 'password1234' });
   assert.equal(breached.status, 400, 'password1234 is in every breach list');
   assert.match(breached.data.message, /Datenlecks/);

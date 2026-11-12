@@ -1,0 +1,467 @@
+/* The other layouts, chosen in the settings (data-layout on <html>, see
+   theme.js). Each one is a look for the whole site on the same markup: its
+   own tokens first (the components follow them), then the shapes and the
+   few structures it changes. styles.css stays the standard look and comes
+   first; these rules override it. layouts.js adds what needs a script. */
+
+/* ---------- the setting itself ---------- */
+
+.layout-list { display: grid; gap: 6px; }
+
+.layout-option {
+  display: grid;
+  gap: 2px;
+  padding: 9px 12px;
+  border-radius: 11px;
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: transform 160ms var(--ease-out);
+}
+
+.layout-option:active { transform: scale(0.98); }
+.layout-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.layout-name { font-size: 0.875rem; font-weight: 600; }
+.layout-hint { color: var(--muted); font-size: 0.75rem; line-height: 1.35; }
+.layout-option:has(input:checked) { background: var(--text); color: var(--bg); }
+.layout-option:has(input:checked) .layout-hint { color: inherit; opacity: 0.75; }
+.layout-option:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+/* =====================================================================
+   Abfahrtstafel: the plan as the departure board of a station. Black
+   board, amber times, white names, a status column, the clock ticking in
+   the header. Rows instead of cards, everywhere.
+   ===================================================================== */
+
+:root[data-layout="tafel"] {
+  color-scheme: dark;
+  --bg: #0b0d10;
+  --surface: #14171c;
+  --surface-2: #20242b;
+  --text: #f3f1e7;
+  --muted: #9ba2ab;
+  --hairline: rgb(255 255 255 / 0.1);
+  --focus: #ffb000;
+  --accent: #ffb000;
+  --accent-fill: #ffb000;
+  --accent-soft: rgb(255 176 0 / 0.14);
+  --on-accent: #0b0d10;
+  --radius: 4px;
+}
+
+:root[data-layout="tafel"] .bar { border-bottom: 2px solid var(--surface-2); }
+:root[data-layout="tafel"] .bar::after { display: none; }
+:root[data-layout="tafel"] .brand strong { color: var(--accent); letter-spacing: 0.02em; }
+
+.bar-clock {
+  padding: 0 10px;
+  color: var(--accent);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+}
+
+@media (max-width: 479px) { .bar-clock { display: none; } }
+
+:root[data-layout="tafel"] .button,
+:root[data-layout="tafel"] .chip,
+:root[data-layout="tafel"] .tab,
+:root[data-layout="tafel"] .tabs-track,
+:root[data-layout="tafel"] .search-field,
+:root[data-layout="tafel"] .field input,
+:root[data-layout="tafel"] .chat-compose textarea,
+:root[data-layout="tafel"] .note-form textarea,
+:root[data-layout="tafel"] .layout-option,
+:root[data-layout="tafel"] .segmented,
+:root[data-layout="tafel"] .segmented span { border-radius: 4px; }
+
+:root[data-layout="tafel"] .button { background: var(--accent); color: var(--on-accent); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.8125rem; }
+:root[data-layout="tafel"] .button-quiet { background: var(--surface-2); color: var(--text); }
+:root[data-layout="tafel"] .button-danger { background: var(--danger-fill); color: #fff; }
+:root[data-layout="tafel"] .chip[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+:root[data-layout="tafel"] .chip[aria-pressed="true"] .count { color: inherit; }
+:root[data-layout="tafel"] .tabs-active { background: var(--accent); }
+:root[data-layout="tafel"] .tabs-active .tab, :root[data-layout="tafel"] .tabs-active .tab-range { color: var(--on-accent); }
+:root[data-layout="tafel"] .tab .tab-kw::after { background: var(--text); }
+
+/* the station: its name, then the next departure as the big line */
+:root[data-layout="tafel"] .title { letter-spacing: 0.01em; }
+:root[data-layout="tafel"] .intro-link a { color: var(--accent); }
+:root[data-layout="tafel"] .now { background: #000; border: 2px solid var(--surface-2); border-radius: 4px; }
+:root[data-layout="tafel"] .now-label { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.75rem; }
+:root[data-layout="tafel"] .now-title { color: var(--accent); }
+:root[data-layout="tafel"] .now-rel { font-variant-numeric: tabular-nums; }
+:root[data-layout="tafel"] .section-title, :root[data-layout="tafel"] .week-title { text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* every day is one board; the week grid of the standard layout is off */
+:root[data-layout="tafel"] .days { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; --hour: 0px; }
+:root[data-layout="tafel"] .hours { display: none; }
+:root[data-layout="tafel"] .allday { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+:root[data-layout="tafel"] .allday-day { grid-column: auto; }
+:root[data-layout="tafel"] .allday-name { position: static; width: auto; height: auto; clip-path: none; padding: 10px 14px 0; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.75rem; }
+:root[data-layout="tafel"] .allday .session-time { display: block; }
+
+:root[data-layout="tafel"] .day,
+:root[data-layout="tafel"] .allday-day {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  border: 2px solid var(--surface-2);
+  border-radius: 4px;
+  background: #000;
+  overflow: hidden;
+}
+
+:root[data-layout="tafel"] .days .day-head,
+:root[data-layout="tafel"] .day-head {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  height: auto;
+  margin: 0;
+  padding: 9px 14px;
+  background: var(--surface-2);
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+:root[data-layout="tafel"] .day-date { color: var(--text); font-weight: 600; font-size: 0.75rem; }
+:root[data-layout="tafel"] .day.is-today .day-date { color: var(--text); }
+:root[data-layout="tafel"] .today-pill { border-radius: 2px; background: var(--accent); color: var(--on-accent); }
+
+:root[data-layout="tafel"] .days .day-items,
+:root[data-layout="tafel"] .day-items { position: static; display: grid; gap: 0; height: auto; border-radius: 0; background: none; }
+:root[data-layout="tafel"] .days .day-empty { display: block; padding: 12px 14px; border-radius: 0; background: none; }
+:root[data-layout="tafel"] .days .day.has-now .day-items::after { display: none; }
+
+/* a row: time · name · room · status */
+:root[data-layout="tafel"] .days .day-items .session,
+:root[data-layout="tafel"] .session {
+  position: static;
+  display: grid;
+  /* time beside the rest; on wide boards (below) room and status get columns of their own */
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "time title" "time room" "time status" "time tag" "bar bar";
+  column-gap: 12px;
+  row-gap: 2px;
+  align-items: baseline;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  padding: 11px 14px;
+  border: 0;
+  border-top: 1px solid var(--hairline);
+  border-radius: 0;
+  background: none;
+  overflow: visible;
+  container-type: normal;
+}
+
+:root[data-layout="tafel"] .day-items .session:first-child, :root[data-layout="tafel"] .allday .session { border-top: 0; }
+:root[data-layout="tafel"] .session-time { grid-area: time; font-size: 0.9375rem; font-weight: 700; color: var(--accent); letter-spacing: 0.02em; white-space: nowrap; }
+:root[data-layout="tafel"] .session-title { grid-area: title; display: block; font-size: 1rem; font-weight: 600; color: var(--text); -webkit-line-clamp: unset; }
+/* the module's colour as a small square before the name, the one colour on a board besides amber */
+:root[data-layout="tafel"] .session-title::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 9px; vertical-align: 1px; background: var(--c, var(--m-misc)); }
+:root[data-layout="tafel"] .session-meta { grid-area: room; color: var(--muted); font-size: 0.875rem; }
+:root[data-layout="tafel"] .session-tag { grid-area: tag; justify-self: start; margin: 2px 0 0; border-radius: 2px; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.6875rem; }
+:root[data-layout="tafel"] .session-status { grid-area: status; display: block !important; color: var(--muted); font-size: 0.875rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* a wide board (the week, not the homepage preview): one row per departure */
+@media (min-width: 720px) {
+  :root[data-layout="tafel"] .days .day-items .session, :root[data-layout="tafel"] .allday .session {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 11em) minmax(0, 12em);
+    grid-template-areas: "time title room status" "time tag room status" "bar bar bar bar";
+    column-gap: 16px;
+  }
+  :root[data-layout="tafel"] .days .session-time, :root[data-layout="tafel"] .allday .session-time { min-width: 7.5em; font-size: 1.0625rem; }
+  :root[data-layout="tafel"] .days .session-status, :root[data-layout="tafel"] .allday .session-status { justify-self: end; text-align: right; }
+}
+:root[data-layout="tafel"] .session-status:empty::before { content: "planmäßig"; }
+:root[data-layout="tafel"] .session.is-past .session-status:empty::before { content: "abgefahren"; }
+:root[data-layout="tafel"] .session.is-next .session-status { color: var(--text); }
+:root[data-layout="tafel"] .session.is-live { background: var(--accent-soft); outline: 0; }
+:root[data-layout="tafel"] .session.is-live .session-status { color: var(--accent); }
+:root[data-layout="tafel"] .session.is-live .session-status::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; background: var(--accent); animation: tafel-blink 1.2s steps(2, jump-none) infinite; }
+:root[data-layout="tafel"] .session.is-past .session-time { color: color-mix(in srgb, var(--accent) 45%, transparent); }
+:root[data-layout="tafel"] .session.is-past .session-title { color: var(--muted); }
+:root[data-layout="tafel"] .session .progress { grid-area: bar; position: static; height: 3px; margin: 8px 0 0; border-radius: 0; }
+:root[data-layout="tafel"] .session.is-live .progress { display: block !important; }
+:root[data-layout="tafel"] .session-note, :root[data-layout="tafel"] .note-button { grid-column: 2 / -1; display: block !important; }
+
+@keyframes tafel-blink { from { opacity: 1; } to { opacity: 0.25; } }
+
+@media (max-width: 719px) {
+  :root[data-layout="tafel"] .day { grid-template-columns: minmax(0, 1fr); }
+  :root[data-layout="tafel"] .day-head { flex-direction: row; padding: 9px 14px; }
+}
+
+/* the rest of the site on the board's terms */
+:root[data-layout="tafel"] .hero-card, :root[data-layout="tafel"] .hero-stage, :root[data-layout="tafel"] .exam,
+:root[data-layout="tafel"] .mensa-col, :root[data-layout="tafel"] .match-day.day, :root[data-layout="tafel"] .match-next,
+:root[data-layout="tafel"] .account-card, :root[data-layout="tafel"] .note-list li, :root[data-layout="tafel"] .dish,
+:root[data-layout="tafel"] .chat-panel, :root[data-layout="tafel"] .settings, :root[data-layout="tafel"] .note-dialog,
+:root[data-layout="tafel"] .search-list { border-radius: 4px; }
+:root[data-layout="tafel"] .square-band i { border-radius: 0; background: var(--accent); }
+:root[data-layout="tafel"] .square-band i:nth-child(3n + 2), :root[data-layout="tafel"] .square-band i:nth-child(7n + 4) { background: var(--surface-2); }
+:root[data-layout="tafel"] .preview-head b { color: var(--accent); }
+:root[data-layout="tafel"] .exam-date { border-radius: 2px; background: var(--accent); color: var(--on-accent); }
+:root[data-layout="tafel"] .chat-fab { border-radius: 4px; background: var(--accent); color: var(--on-accent); box-shadow: none; }
+:root[data-layout="tafel"] .chat-msg.is-mine .chat-text { background: var(--accent); color: var(--on-accent); }
+:root[data-layout="tafel"] .chat-text { border-radius: 4px; }
+:root[data-layout="tafel"] .match-legend .is-a, :root[data-layout="tafel"] .match-bar.is-a { --c: var(--accent); }
+:root[data-layout="tafel"] .match-legend .is-b, :root[data-layout="tafel"] .match-bar.is-b { --c: var(--text); }
+
+/* =====================================================================
+   Plakat: a Swiss poster. One face, huge; black rules; square corners;
+   black, white and red and nothing else. Modules tell apart by name.
+   ===================================================================== */
+
+:root[data-layout="plakat"] {
+  --bg: light-dark(#ffffff, #000000);
+  --surface: light-dark(#ffffff, #000000);
+  --surface-2: light-dark(#ececec, #1a1a1a);
+  --text: light-dark(#000000, #ffffff);
+  --muted: light-dark(#3d3d3d, #c4c4c4);
+  --hairline: light-dark(#000000, #ffffff);
+  --focus: #e4001b;
+  --accent: light-dark(#d4001a, #ff4d5a); /* as text: 4.5:1 on white and on black */
+  --accent-fill: #e4001b;
+  --accent-soft: rgb(228 0 27 / 0.1);
+  --on-accent: #ffffff;
+  --danger: light-dark(#d4001a, #ff4d5a);
+  --danger-fill: #e4001b;
+  --radius: 0;
+  --m0: var(--text); --m1: var(--text); --m2: var(--text); --m3: var(--text); --m4: var(--text);
+  --m5: var(--text); --m6: var(--text); --m7: var(--text); --m8: var(--text); --m9: var(--text); --m-misc: var(--text);
+}
+
+:root[data-layout="plakat"] *, :root[data-layout="plakat"] *::before, :root[data-layout="plakat"] *::after { border-radius: 0 !important; }
+
+:root[data-layout="plakat"] .bar { border-bottom: 3px solid var(--text); }
+:root[data-layout="plakat"] .bar::after { display: none; }
+:root[data-layout="plakat"] .brand strong { text-transform: uppercase; letter-spacing: -0.02em; font-weight: 800; }
+:root[data-layout="plakat"] .search-field { background: var(--bg); box-shadow: inset 0 0 0 2px var(--text); color: var(--text); }
+:root[data-layout="plakat"] .search-field input::placeholder { color: var(--muted); }
+
+:root[data-layout="plakat"] .button { background: var(--text); color: var(--bg); text-transform: uppercase; letter-spacing: 0.02em; font-weight: 700; }
+:root[data-layout="plakat"] .button-quiet { background: var(--bg); color: var(--text); box-shadow: inset 0 0 0 2px var(--text); }
+:root[data-layout="plakat"] .button-danger { background: var(--accent); color: #fff; }
+:root[data-layout="plakat"] .chip { background: var(--bg); box-shadow: inset 0 0 0 2px var(--text); font-weight: 700; }
+:root[data-layout="plakat"] .chip[aria-pressed="true"] { background: var(--text); color: var(--bg); box-shadow: none; }
+:root[data-layout="plakat"] .chip .dot { display: none; }
+:root[data-layout="plakat"] .tabs-track { padding: 0; background: none; border-top: 3px solid var(--text); border-bottom: 3px solid var(--text); }
+:root[data-layout="plakat"] .tabs-active { inset: 0; background: var(--text); }
+:root[data-layout="plakat"] .tabs-active .tab, :root[data-layout="plakat"] .tabs-active .tab-range { color: var(--bg); }
+:root[data-layout="plakat"] .tab-kw { font-weight: 800; }
+:root[data-layout="plakat"] .tab.is-past .tab-kw { color: var(--muted); }
+
+/* the course as a poster: the code at poster size, a red rule under it */
+:root[data-layout="plakat"] .intro { gap: 24px; }
+:root[data-layout="plakat"] .title { font-size: clamp(2.75rem, 6.6vw, 6rem); font-weight: 800; letter-spacing: -0.05em; text-transform: uppercase; line-height: 0.92; }
+:root[data-layout="plakat"] .title-full { max-width: none; font-size: clamp(1.25rem, 2.4vw, 1.75rem); font-weight: 800; text-transform: uppercase; letter-spacing: -0.02em; line-height: 1.1; }
+:root[data-layout="plakat"] .subtitle { max-width: 48ch; color: var(--text); font-size: 1.125rem; font-weight: 500; }
+:root[data-layout="plakat"] .intro-link a { color: var(--accent); font-weight: 700; }
+:root[data-layout="plakat"] .now { padding: 18px 0 0; border-top: 6px solid var(--text); background: none; }
+:root[data-layout="plakat"] .now.is-live { border-top-color: var(--accent); }
+:root[data-layout="plakat"] .now-label { color: var(--text); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 800; }
+:root[data-layout="plakat"] .now-title { font-size: clamp(1.75rem, 3.4vw, 2.5rem); font-weight: 800; letter-spacing: -0.03em; }
+:root[data-layout="plakat"] .now-pulse { background: var(--accent); }
+:root[data-layout="plakat"] .progress { background: var(--surface-2); }
+:root[data-layout="plakat"] .week-title, :root[data-layout="plakat"] .section-title { font-size: clamp(2.25rem, 5.5vw, 4.5rem); font-weight: 800; text-transform: uppercase; letter-spacing: -0.04em; line-height: 0.95; }
+:root[data-layout="plakat"] .week-facts { color: var(--text); font-weight: 600; }
+
+/* the day: its name with a giant first letter */
+:root[data-layout="plakat"] .day-head { align-items: flex-end; gap: 0 10px; }
+:root[data-layout="plakat"] .day-name { display: block; font-size: 0.875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; line-height: 1; }
+:root[data-layout="plakat"] .day-name::first-letter { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.04em; }
+:root[data-layout="plakat"] .day-date { color: var(--text); font-weight: 700; }
+:root[data-layout="plakat"] .day.is-today .day-date { color: var(--accent); }
+:root[data-layout="plakat"] .today-pill { background: var(--accent-fill); color: #fff; } /* the fill red: 4.6:1 under white */
+
+/* the list (phones, tablets): rules between entries, no cards */
+:root[data-layout="plakat"] .session { padding: 10px 0 14px; border: 0; border-top: 3px solid var(--text); background: none; }
+:root[data-layout="plakat"] .session-time { font-size: 1.25rem; font-weight: 800; color: var(--text); letter-spacing: -0.02em; }
+:root[data-layout="plakat"] .session-title { font-weight: 700; }
+:root[data-layout="plakat"] .session-meta { color: var(--muted); font-weight: 500; }
+:root[data-layout="plakat"] .session-tag { background: var(--accent-fill); color: #fff; text-transform: uppercase; letter-spacing: 0.04em; }
+:root[data-layout="plakat"] .session.is-live { outline: 0; border-top-color: var(--accent); }
+:root[data-layout="plakat"] .session.is-live .session-time, :root[data-layout="plakat"] .session.is-live .session-status { color: var(--accent); }
+:root[data-layout="plakat"] .session.is-next .session-status { color: var(--text); font-weight: 700; }
+:root[data-layout="plakat"] .session.is-past { color: var(--muted); border-top-color: var(--muted); }
+:root[data-layout="plakat"] .session.is-past .session-time, :root[data-layout="plakat"] .session.is-past .session-title { color: var(--muted); }
+:root[data-layout="plakat"] .day-empty { padding: 12px 0; border-top: 3px solid var(--text); background: none; color: var(--muted); font-weight: 600; }
+
+/* the week grid (wide screens): black hour rules, outlined blocks, red for now */
+@media (min-width: 1000px) {
+  :root[data-layout="plakat"] .days { --hour: 60px; gap: 0 14px; }
+  :root[data-layout="plakat"] .days .day-head { height: 52px; margin-bottom: 6px; padding: 0; }
+  :root[data-layout="plakat"] .hours { margin-top: 58px; }
+  :root[data-layout="plakat"] .hours span { color: var(--text); font-size: 1rem; font-weight: 800; right: 10px; }
+  :root[data-layout="plakat"] .days .day-items { background-color: transparent; background-image: repeating-linear-gradient(to bottom, var(--text) 0 1px, transparent 1px var(--hour)); border-left: 3px solid var(--text); } /* taste-skill-ignore: the hour rules */
+  :root[data-layout="plakat"] .days .day.is-today .day-items { background-color: var(--surface-2); }
+  :root[data-layout="plakat"] .days .day-items .session { padding: 8px 10px 8px 12px; border: 2px solid var(--text); background: var(--bg); }
+  :root[data-layout="plakat"] .days .day-items .session.is-live { background: var(--accent); border-color: var(--accent); color: #fff; }
+  :root[data-layout="plakat"] .days .day-items .session.is-live .session-time, :root[data-layout="plakat"] .days .day-items .session.is-live .session-title,
+  :root[data-layout="plakat"] .days .day-items .session.is-live .session-meta, :root[data-layout="plakat"] .days .day-items .session.is-live .session-status { color: #fff; }
+  :root[data-layout="plakat"] .days .day-items .session.is-live .progress { background: rgb(255 255 255 / 0.3); }
+  :root[data-layout="plakat"] .days .day-items .session.is-live .progress i { background: #fff; }
+  :root[data-layout="plakat"] .days .day-items .session.is-next { border-color: var(--accent); }
+  :root[data-layout="plakat"] .days .day-items .session.is-past { border-color: var(--muted); }
+  :root[data-layout="plakat"] .days .day.has-now .day-items::after { height: 4px; left: -3px; background: var(--accent); box-shadow: none; }
+  :root[data-layout="plakat"] .days .day-empty { display: none; }
+}
+
+/* the rest of the site: surfaces drawn with rules, the motif in black */
+:root[data-layout="plakat"] .hero-card, :root[data-layout="plakat"] .hero-stage, :root[data-layout="plakat"] .exam,
+:root[data-layout="plakat"] .mensa-col, :root[data-layout="plakat"] .match-day.day, :root[data-layout="plakat"] .match-next,
+:root[data-layout="plakat"] .note-list li, :root[data-layout="plakat"] .account-card { background: var(--bg); box-shadow: inset 0 0 0 3px var(--text); }
+:root[data-layout="plakat"] .exam-date { background: var(--text); color: var(--bg); }
+:root[data-layout="plakat"] .exam-name { font-weight: 800; }
+:root[data-layout="plakat"] .dish { background: none; border-top: 2px solid var(--text); padding-inline: 0; }
+:root[data-layout="plakat"] .mensa-days .chip[aria-pressed="true"] { background: var(--accent); color: #fff; }
+:root[data-layout="plakat"] .hero-body { align-items: flex-start; text-align: left; }
+:root[data-layout="plakat"] .hero-title { font-size: clamp(2.125rem, 3.5vw, 3.25rem); font-weight: 800; letter-spacing: -0.05em; line-height: 0.92; text-transform: uppercase; text-wrap: balance; overflow-wrap: anywhere; }
+:root[data-layout="plakat"] .hero-lead { max-width: 44ch; font-size: 1.25rem; font-weight: 600; }
+:root[data-layout="plakat"] .hero-links { justify-content: flex-start; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; font-size: 0.875rem; }
+:root[data-layout="plakat"] .square-band { height: 14px; padding: 0; background: var(--accent); }
+:root[data-layout="plakat"] .square-band i { display: none; }
+:root[data-layout="plakat"] .search-hero .search-field { box-shadow: inset 0 0 0 3px var(--text); }
+:root[data-layout="plakat"] .preview-head b { font-weight: 800; text-transform: uppercase; }
+:root[data-layout="plakat"] .program-mark { background: var(--text); }
+:root[data-layout="plakat"] .faculty-title { font-weight: 800; text-transform: uppercase; letter-spacing: -0.02em; }
+:root[data-layout="plakat"] .how-diagram .d-pale { fill: var(--surface-2); }
+:root[data-layout="plakat"] .how-diagram .d-mid, :root[data-layout="plakat"] .how-diagram .d-ink { fill: var(--text); }
+:root[data-layout="plakat"] body[data-view="home"] .foot, :root[data-layout="plakat"] .home-foot { background: var(--text); }
+:root[data-layout="plakat"] .bm-block { fill: var(--bg) !important; }
+:root[data-layout="plakat"] .chat-fab { background: var(--accent); color: #fff; box-shadow: none; }
+:root[data-layout="plakat"] .chat-panel, :root[data-layout="plakat"] .settings, :root[data-layout="plakat"] .note-dialog, :root[data-layout="plakat"] .search-list { box-shadow: 0 0 0 3px var(--text); }
+:root[data-layout="plakat"] .chat-msg.is-mine .chat-text { background: var(--accent); color: #fff; }
+:root[data-layout="plakat"] .field input, :root[data-layout="plakat"] .chat-compose textarea, :root[data-layout="plakat"] .note-form textarea { background: var(--bg); box-shadow: inset 0 0 0 2px var(--text); }
+:root[data-layout="plakat"] .match-legend .is-a, :root[data-layout="plakat"] .match-bar.is-a { --c: var(--text); }
+:root[data-layout="plakat"] .match-legend .is-b, :root[data-layout="plakat"] .match-bar.is-b { --c: var(--muted); }
+:root[data-layout="plakat"] .match-legend .is-free, :root[data-layout="plakat"] .match-bar.is-free { --c: var(--accent); }
+:root[data-layout="plakat"] .match-gaps li { background: var(--accent); color: #fff; }
+:root[data-layout="plakat"] .match-gaps span { color: inherit; opacity: 0.8; }
+
+/* =====================================================================
+   Tageslicht: the page takes the colour of the hour (layouts.js sets the
+   sky and the sun's place each minute); the text turns light at dusk.
+   Surfaces are glass over the sky, "now" is the sun.
+   ===================================================================== */
+
+:root[data-layout="tageslicht"] {
+  color-scheme: light;
+  --sky-top: #bde2ff;
+  --sky-bottom: #ffffff;
+  --sun-x: 50%;
+  --sun-y: 1;
+  --bg: var(--sky-top);
+  --surface: rgb(255 255 255 / 0.62);
+  --surface-2: rgb(255 255 255 / 0.42);
+  --text: #141d3a;
+  --muted: #475273;
+  --hairline: rgb(20 29 58 / 0.14);
+  --sun: #ffd34d;
+  --sun-glow: rgb(255 176 0 / 0.55);
+}
+
+:root[data-layout="tageslicht"][data-sky="dark"] {
+  color-scheme: dark;
+  --surface: rgb(255 255 255 / 0.09);
+  --surface-2: rgb(255 255 255 / 0.16);
+  --text: #eef1ff;
+  --muted: #b3bbdf;
+  --hairline: rgb(255 255 255 / 0.16);
+  --sun: #f1f3ff;
+  --sun-glow: rgb(200 210 255 / 0.45);
+}
+
+:root[data-layout="tageslicht"] { background: var(--sky-top); }
+:root[data-layout="tageslicht"] body { background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom)) fixed; } /* taste-skill-ignore: the sky itself */
+:root[data-layout="tageslicht"] .bar { background: color-mix(in srgb, var(--sky-top) 82%, transparent); }
+:root[data-layout="tageslicht"] .bar::after { display: none; }
+:root[data-layout="tageslicht"] .button { background: var(--text); color: var(--sky-bottom); }
+:root[data-layout="tageslicht"][data-sky="dark"] .button { color: #141d3a; }
+:root[data-layout="tageslicht"] .button-quiet { background: var(--surface-2); color: var(--text); }
+:root[data-layout="tageslicht"] .button-danger { background: var(--danger-soft); color: var(--danger); }
+:root[data-layout="tageslicht"] .chip[aria-pressed="true"] { background: var(--text); color: var(--sky-bottom); }
+:root[data-layout="tageslicht"][data-sky="dark"] .chip[aria-pressed="true"] { color: #141d3a; }
+:root[data-layout="tageslicht"] .tabs-track { background: var(--surface-2); }
+:root[data-layout="tageslicht"] .tabs-active { background: var(--surface); }
+:root[data-layout="tageslicht"] body[data-view="home"] .foot { background: rgb(20 29 58 / 0.55); }
+
+/* the horizon under the course title: the day from 6 to 22, the sun where
+   the time is now, today's lectures as marks on the ground */
+.sky-strip { display: none; }
+
+:root[data-layout="tageslicht"] .sky-strip {
+  display: block;
+  grid-column: 1 / -1;
+  position: relative;
+  height: 76px;
+  margin-top: 4px;
+}
+
+:root[data-layout="tageslicht"] .sky-strip::before { content: ""; position: absolute; inset: auto 0 20px; height: 2px; background: var(--hairline); }
+:root[data-layout="tageslicht"] .sky-hour { position: absolute; bottom: 0; left: var(--x); transform: translateX(-50%); color: var(--muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+:root[data-layout="tageslicht"] .sky-tick { position: absolute; bottom: 16px; left: var(--a); width: max(4px, calc(var(--b) - var(--a))); height: 10px; border-radius: 3px; background: var(--accent); opacity: 0.85; }
+:root[data-layout="tageslicht"] .sky-body {
+  position: absolute;
+  left: var(--sun-x);
+  bottom: calc(20px + var(--sun-y) * 46px);
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border-radius: 50%;
+  background: var(--sun);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--sun) 30%, transparent), 0 0 26px var(--sun-glow);
+}
+
+/* in the week grid, the now-line is the sun at the column's edge */
+@media (min-width: 1000px) {
+  :root[data-layout="tageslicht"] .days .day-items { background-color: rgb(255 255 255 / 0.22); }
+  :root[data-layout="tageslicht"][data-sky="dark"] .days .day-items { background-color: rgb(255 255 255 / 0.05); }
+  :root[data-layout="tageslicht"] .days .day.is-today .day-items { background-color: rgb(255 255 255 / 0.4); }
+  :root[data-layout="tageslicht"][data-sky="dark"] .days .day.is-today .day-items { background-color: rgb(255 255 255 / 0.09); }
+  :root[data-layout="tageslicht"] .days .day.has-now .day-items::after {
+    left: -8px;
+    right: auto;
+    width: 16px;
+    height: 16px;
+    margin-top: -8px;
+    border-radius: 50%;
+    background: var(--sun);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--sun) 30%, transparent), 0 0 22px var(--sun-glow);
+  }
+  :root[data-layout="tageslicht"] .days .day.has-now .day-items::before {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    left: 0;
+    right: 0;
+    top: calc((var(--now) - var(--lo)) * var(--hour));
+    height: 1px;
+    background: var(--sun);
+    opacity: 0.6;
+    pointer-events: none;
+  }
+}
+
+/* glass that stays readable: the one place blur is the point of the look */
+:root[data-layout="tageslicht"] .now, :root[data-layout="tageslicht"] .session, :root[data-layout="tageslicht"] .hero-card,
+:root[data-layout="tageslicht"] .hero-stage, :root[data-layout="tageslicht"] .exam, :root[data-layout="tageslicht"] .mensa-col,
+:root[data-layout="tageslicht"] .match-day.day, :root[data-layout="tageslicht"] .match-next, :root[data-layout="tageslicht"] .account-card,
+:root[data-layout="tageslicht"] .chat-panel, :root[data-layout="tageslicht"] .settings, :root[data-layout="tageslicht"] .note-dialog,
+:root[data-layout="tageslicht"] .search-list { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+:root[data-layout="tageslicht"] .chat-fab { background: var(--sun); color: #141d3a; box-shadow: 0 6px 20px var(--sun-glow); }
+:root[data-layout="tageslicht"] .now.is-live .now-label, :root[data-layout="tageslicht"] .session.is-live .session-status { color: var(--text); }
+:root[data-layout="tageslicht"] .session.is-live { outline-color: var(--sun); }
+:root[data-layout="tageslicht"] .exam-date { background: var(--surface-2); color: var(--text); }
+:root[data-layout="tageslicht"] .square-band i { background: var(--sun); }
+:root[data-layout="tageslicht"] .square-band i:nth-child(3n + 2), :root[data-layout="tageslicht"] .square-band i:nth-child(7n + 4) { background: var(--surface-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-layout="tafel"] .session.is-live .session-status::before { animation: none; }
+}
